@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProofTerm",
+  "description": "Proof-Carrying Command (PCC) v1.1 Schema for Spacecraft Autonomy Authorization",
+  "type": "object",
+  "properties": {
+    "command_id": {
+      "type": "string",
+      "description": "Unique command identifier string"
+    },
+    "command_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-fA-F0-9]{64}$",
+      "description": "Cryptographic SHA-256 hash binding certificate to exact command bytes"
+    },
+    "sequence_no": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonically increasing sequence number for replay protection"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp marking start of validity window"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp marking end of validity window"
+    },
+    "property": {
+      "type": "string",
+      "description": "Safety property description (e.g. post_maneuver_omega_bound)"
+    },
+    "bound": {
+      "type": "object",
+      "properties": {
+        "axis": { "type": "string" },
+        "max_rad_s": { "type": "number", "minimum": 0 }
+      },
+      "required": ["axis", "max_rad_s"]
+    },
+    "model_id": {
+      "type": "string",
+      "description": "Explicit dynamics model identifier for model/reality gap transparency"
+    },
+    "context_ref": {
+      "type": "string",
+      "description": "Reference to cFS telemetry frame ID used for state estimation"
+    },
+    "certificate": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["farkas_linear_infeasibility"] },
+        "multipliers": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "description": "Vector of non-negative Farkas multipliers (lambda >= 0)"
+        },
+        "contradiction": { "type": "string" }
+      },
+      "required": ["type", "multipliers", "contradiction"]
+    },
+    "signature": {
+      "type": "string",
+      "description": "HMAC-SHA256 or Ed25519 signature covering all certificate payload fields"
+    }
+  },
+  "required": [
+    "command_id",
+    "command_hash",
+    "sequence_no",
+    "valid_from",
+    "valid_until",
+    "property",
+    "bound",
+    "model_id",
+    "context_ref",
+    "certificate",
+    "signature"
+  ]
+}

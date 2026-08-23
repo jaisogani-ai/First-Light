@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASA cFS — Proof-Carrying Commands (PCC) Flight Safety System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="9" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="3 3"/>
+                        <path d="M12 3L15 9L21 12L15 15L12 21L9 15L3 12L9 9L12 3Z" fill="#38BDF8"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="title">PCC FLIGHT GATE</span>
+                    <span class="subtitle">NASA cFS Substrate v1.1</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-screen="orbit">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                    <span>Orbital & Attitude 3D</span>
+                </button>
+                <button class="nav-item" data-screen="sandbox">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                    <span>Maneuver Planner</span>
+                </button>
+                <button class="nav-item" data-screen="timeline">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Command Telemetry</span>
+                </button>
+                <button class="nav-item" data-screen="security">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>Adversarial Lab</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-status">
+                <div class="status-indicator online pulse"></div>
+                <div class="status-details">
+                    <span class="label">cFS Software Bus</span>
+                    <span class="value">MID 0x1808 CONNECTED</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="screen-title">Spacecraft Orbital & Attitude Dynamics</h1>
+                    <p class="header-sub">Pre-Execution Proof-Carrying Authorization for Spacecraft AI Autonomy</p>
+                </div>
+                <div class="action-bar">
+                    <button class="btn btn-secondary" id="btn-trigger-safe">
+                        <span class="btn-icon">▶</span> Run Safe RCS Maneuver
+                    </button>
+                    <button class="btn btn-warning" id="btn-trigger-unsafe">
+                        <span class="btn-icon">⚠</span> Simulate Unsafe AI Maneuver
+                    </button>
+                    <button class="btn btn-danger" id="btn-trigger-attack">
+                        <span class="btn-icon">⚡</span> Trigger Replay Attack
+                    </button>
+                </div>
+            </header>
+
+            <!-- Screen 1: 3D Orbital & Attitude Visualizer -->
+            <section id="screen-orbit" class="screen-view active">
+                <div class="orbit-grid">
+                    <!-- Left: Interactive Canvas Satellite Simulation -->
+                    <div class="panel canvas-panel">
+                        <div class="panel-header">
+                            <h2>Spacecraft Attitude & Orbital Visualizer</h2>
+                            <span class="badge badge-cyan" id="sat-state-badge">STABLE LEO ORBIT</span>
+                        </div>
+                        <div class="canvas-container">
+                            <canvas id="sat-canvas" width="600" height="380"></canvas>
+                            <div class="canvas-overlay">
+                                <div class="telemetry-pill">
+                                    <span class="pill-label">Angular Velocity ||ω||:</span>
+                                    <span class="pill-val" id="disp-omega">0.014 rad/s</span>
+                                </div>
+                                <div class="telemetry-pill">
+                                    <span class="pill-label">Max Allowed Bound:</span>
+                                    <span class="pill-val amber" id="disp-bound">0.050 rad/s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Farkas Barrier Certificate Math Chart -->
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <h2>Farkas Infeasibility Barrier Plot</h2>
+                            <span class="badge badge-primary">Farkas Lemma Certificate</span>
+                        </div>
+                        <div class="canvas-container">
+                            <canvas id="farkas-canvas" width="480" height="280"></canvas>
+                        </div>
+                        <div class="farkas-math-box">
+                            <span class="math-title">Farkas Contradiction Condition:</span>
+                            <code class="math-expr" id="farkas-expr">λᵀ · (C·x_post - d) = -0.0140 < 0  (PROVED SAFE)</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <span class="stat-label">cFS VERIFIER LATENCY</span>
+                        <span class="stat-value highlight-cyan" id="stat-verifier-time">2.1 ms</span>
+                        <span class="stat-meta">5-Step Arithmetic Check</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">GROUND Z3 SOLVE TIME</span>
+                        <span class="stat-value highlight-amber" id="stat-producer-time">4,180 ms</span>
+                        <span class="stat-meta">Offloaded SMT Solver</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">COMPUTATIONAL ASYMMETRY</span>
+                        <span class="stat-value highlight-green" id="stat-asymmetry">1,990x</span>
+                        <span class="stat-meta">Offloaded vs On-Board</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">COMMANDS VERIFIED / DROPPED</span>
+                        <span class="stat-value"><span id="pass-count">142</span> / <span id="drop-count" class="text-red">3</span></span>
+                        <span class="stat-meta">Zero On-Board Violations</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen 2: Interactive Maneuver Planner (AI Agent Sandbox) -->
+            <section id="screen-sandbox" class="screen-view">
+                <div class="sandbox-grid">
+                    <div class="panel controls-panel">
+                        <div class="panel-header">
+                            <h2>AI Agent Maneuver Proposal Sandbox</h2>
+                            <span class="badge badge-info">Interactive Parameter Controls</span>
+                        </div>
+
+                        <div class="slider-group">
+                            <label>Initial Angular Velocity ω_x (rad/s): <span id="val-wx">0.010</span></label>
+                            <input type="range" id="slider-wx" min="-0.05" max="0.05" step="0.005" value="0.010">
+                        </div>
+                        <div class="slider-group">
+                            <label>Initial Angular Velocity ω_y (rad/s): <span id="val-wy">0.010</span></label>
+                            <input type="range" id="slider-wy" min="-0.05" max="0.05" step="0.005" value="0.010">
+                        </div>
+                        <div class="slider-group">
+                            <label>Proposed RCS Thrust Torque u_x (Nm): <span id="val-ux">0.001</span></label>
+                            <input type="range" id="slider-ux" min="-0.05" max="0.05" step="0.001" value="0.001">
+                        </div>
+                        <div class="slider-group">
+                            <label>Proposed RCS Thrust Torque u_y (Nm): <span id="val-uy">-0.002</span></label>
+                            <input type="range" id="slider-uy" min="-0.05" max="0.05" step="0.001" value="-0.002">
+                        </div>
+
+                        <button class="btn btn-primary full-width" id="btn-calc-proof">
+                            Evaluate Z3 Proof & Test NASA cFS Verifier
+                        </button>
+                    </div>
+
+                    <div class="panel proof-output-panel">
+                        <div class="panel-header">
+                            <h2>Live Generated Farkas Certificate Payload</h2>
+                            <span class="badge badge-cyan">Schema v1.1</span>
+                        </div>
+                        <pre class="json-code" id="sandbox-json-display"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen 3: Telemetry Stream -->
+            <section id="screen-timeline" class="screen-view">
+                <div class="panel feed-panel">
+                    <div class="panel-header">
+                        <h2>NASA cFS Software Bus Message Stream</h2>
+                        <span class="badge badge-info">Message ID 0x1808 (Raw) -> 0x1809 (Verified)</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="cmd-table">
+                            <thead>
+                                <tr>
+                                    <th>COMMAND ID</th>
+                                    <th>PROPERTY</th>
+                                    <th>STATUS</th>
+                                    <th>VERIFIER TIME</th>
+                                    <th>SOLVER TIME</th>
+                                    <th>TIMESTAMP</th>
+                                    <th>REASON</th>
+                                </tr>
+                            </thead>
+                            <tbody id="timeline-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen 4: Adversarial Lab -->
+            <section id="screen-security" class="screen-view">
+                <div class="security-grid">
+                    <div class="panel attack-card">
+                        <div class="panel-header">
+                            <h2>Scenario A: Hallucinated Unsafe AI Maneuver</h2>
+                            <span class="badge badge-amber">Refused at Z3 Generation</span>
+                        </div>
+                        <p class="card-desc">An AI agent attempts an excessive RCS thruster burn that would cause spacecraft tumble (>0.05 rad/s). Z3 SMT solver fails to find a Farkas proof, so no command is sent.</p>
+                        <button class="btn btn-warning" onclick="document.getElementById('btn-trigger-unsafe').click()">Run Scenario A</button>
+                    </div>
+
+                    <div class="panel attack-card">
+                        <div class="panel-header">
+                            <h2>Scenario B: Command Hash Mismatch Attack</h2>
+                            <span class="badge badge-danger">Caught at cFS Step 2</span>
+                        </div>
+                        <p class="card-desc">An attacker intercepting the uplink attempts to attach a valid proof to a different unsafe command. SHA-256 hash check fails inside NASA cFS.</p>
+                        <button class="btn btn-danger" onclick="triggerHashMismatch()">Run Scenario B</button>
+                    </div>
+
+                    <div class="panel attack-card">
+                        <div class="panel-header">
+                            <h2>Scenario C: Monotonic Replay Attack</h2>
+                            <span class="badge badge-danger">Caught at cFS Step 1</span>
+                        </div>
+                        <p class="card-desc">An adversary replays a previously accepted valid proof packet. Sequence number comparison (Seq #1043 <= Last #1043) drops packet instantly.</p>
+                        <button class="btn btn-danger" onclick="document.getElementById('btn-trigger-attack').click()">Run Scenario C</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
