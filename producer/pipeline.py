@@ -15,7 +15,13 @@ import numpy as np
 
 from producer.certificate import FarkasCertificateGenerator
 from producer.dynamics_model import SpacecraftDynamics
+from producer.llm_planner import propose_torque_llm
 from producer.rules import RULE_REGISTRY
+
+MANEUVER_PRESETS = {
+    "SAFE_RCS_PULSE": {"x0": [0.01, 0.01, 0.00], "u_cmd": [0.001, -0.002, 0.001]},
+    "UNSAFE_RCS_PULSE": {"x0": [0.04, 0.03, 0.02], "u_cmd": [0.100, 0.200, 0.150]},
+}
 
 
 @dataclass(frozen=True)
@@ -39,25 +45,41 @@ class MissionPipeline:
         self.cert_gen = FarkasCertificateGenerator()
         self.sequence_allocator = sequence_allocator
 
-    def run(self, command_id: str, maneuver_type: str, x0, u_cmd, mission_profile: dict, dt: float = 0.1) -> dict:
+    def run(self, command_id: str, maneuver_type: str, x0, mission_profile: dict, u_cmd=None, dt: float = 0.1) -> dict:
         run_id = str(uuid.uuid4())
         steps: list[AgentStepRecord] = []
         max_omega = mission_profile["max_omega_rad_s"]
 
-        # 1. Mission Planner Agent
+        # 1. Mission Planner Agent — real Claude API call proposes u_cmd unless the caller
+        # provided an explicit override (e.g. sandbox sliders). This is the PCC principle
+        # applied to the producer itself: the AI proposes, the deterministic pipeline proves.
         t0 = time.perf_counter()
+        preset = MANEUVER_PRESETS.get(maneuver_type, {"u_cmd": [0.0, 0.0, 0.0]})
+        if u_cmd is not None:
+            planner_reasoning = f"Using explicit torque override for {maneuver_type} (sandbox)."
+            source = "explicit_override"
+        else:
+            try:
+                u_cmd, llm_reasoning = propose_torque_llm(maneuver_type, list(x0), mission_profile)
+                planner_reasoning = f"Claude proposed u_cmd={u_cmd}: {llm_reasoning}"
+                source = "llm"
+            except Exception as err:
+                u_cmd = preset["u_cmd"]
+                planner_reasoning = (
+                    f"LLM proposal unavailable ({err}); fell back to the deterministic "
+                    f"{maneuver_type} preset u_cmd={u_cmd}."
+                )
+                source = "deterministic_fallback"
+
         steps.append(AgentStepRecord(
             step_order=1,
             agent_name="Mission Planner Agent",
-            inputs={"maneuver_type": maneuver_type, "x0": list(x0), "u_cmd": list(u_cmd),
+            inputs={"maneuver_type": maneuver_type, "x0": list(x0),
                     "mission_profile": mission_profile["profile_key"]},
-            outputs={"command_id": command_id, "maneuver_type": maneuver_type},
+            outputs={"command_id": command_id, "maneuver_type": maneuver_type, "u_cmd": list(u_cmd), "source": source},
             latency_ms=(time.perf_counter() - t0) * 1000,
             confidence=1.0,
-            reasoning_summary=(
-                f"Selected {maneuver_type} for {mission_profile['display_name']} "
-                f"(envelope {max_omega:.3f} rad/s)."
-            ),
+            reasoning_summary=planner_reasoning,
             status="COMPLETED",
         ))
 

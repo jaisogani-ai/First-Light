@@ -52,20 +52,23 @@ def propose(req: ProposeRequest, request: Request):
             return seq_holder["value"]
 
     pipeline = MissionPipeline(allocate_sequence)
-    default_preset = MANEUVER_PRESETS.get(req.maneuver_type, {"x0": [0.0, 0.0, 0.0], "u_cmd": [0.0, 0.0, 0.0]})
-    preset = {"x0": req.x0 or default_preset["x0"], "u_cmd": req.u_cmd or default_preset["u_cmd"]}
+    default_preset = MANEUVER_PRESETS.get(req.maneuver_type, {"x0": [0.0, 0.0, 0.0]})
+    x0 = req.x0 or default_preset["x0"]
     cmd_id = f"RCS_PULSE_{uuid.uuid4().hex[:8].upper()}"
 
+    # req.u_cmd is only set for explicit sandbox overrides — otherwise leave it None so
+    # the Mission Planner Agent's real Claude API call proposes the torque command.
     t0 = time.perf_counter()
-    result = pipeline.run(cmd_id, req.maneuver_type, preset["x0"], preset["u_cmd"], profile)
+    result = pipeline.run(cmd_id, req.maneuver_type, x0, profile, u_cmd=req.u_cmd)
     producer_time_ms = (time.perf_counter() - t0) * 1000
     PRODUCER_LATENCY.observe(producer_time_ms)
+    actual_u_cmd = result["steps"][0]["outputs"]["u_cmd"] if result["steps"] else [0.0, 0.0, 0.0]
 
     command_row_id = None
     if not result["refused"]:
         with engine.begin() as conn:
             command_row_id = persist_command(
-                conn, cmd_id, profile["id"], result["proof"], preset["u_cmd"], seq_holder["value"], producer_time_ms
+                conn, cmd_id, profile["id"], result["proof"], actual_u_cmd, seq_holder["value"], producer_time_ms
             )
             persist_pipeline_steps(conn, command_row_id, result["run_id"], result["steps"])
     else:
@@ -83,7 +86,7 @@ def propose(req: ProposeRequest, request: Request):
         "refusal_reason": result["refusal_reason"],
         "producer_time_ms": producer_time_ms,
         "proof": result["proof"],
-        "u_cmd": preset["u_cmd"],
+        "u_cmd": actual_u_cmd,
         "pipeline_steps": result["steps"],
     }
 

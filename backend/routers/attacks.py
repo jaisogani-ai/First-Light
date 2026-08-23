@@ -50,7 +50,9 @@ def run_attack(req: AttackRequest):
     pipeline = MissionPipeline(allocate_sequence)
     preset = MANEUVER_PRESETS["SAFE_RCS_PULSE"]
     cmd_id = f"RCS_PULSE_{uuid.uuid4().hex[:8].upper()}"
-    result = pipeline.run(cmd_id, "SAFE_RCS_PULSE", preset["x0"], preset["u_cmd"], profile)
+    # Explicit u_cmd (not LLM-proposed): the Attack Library needs a deterministic, reliably
+    # safe baseline to mutate — that's what's under test here, not the Planner's LLM call.
+    result = pipeline.run(cmd_id, "SAFE_RCS_PULSE", preset["x0"], profile, u_cmd=preset["u_cmd"])
 
     if result["refused"]:
         raise HTTPException(500, "Baseline proposal for attack scenario was unexpectedly refused")

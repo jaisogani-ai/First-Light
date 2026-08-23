@@ -3,8 +3,14 @@
 import secrets
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Loads .env into the real process environment (not just this Settings object) so
+# ANTHROPIC_API_KEY — read directly by the Anthropic SDK's default credential
+# resolution, not through pydantic-settings — can live in the same .env file.
+load_dotenv()
 
 _SECRET_KEY_FILE = Path(__file__).resolve().parent.parent / ".pcc_secret_key"
 

@@ -1,12 +1,7 @@
 """Mission Planner Agent entry point — thin convenience wrapper around the full producer
 pipeline (see producer/pipeline.py for the Planner/Dynamics/Safety/Proof/Reviewer chain)."""
 
-from producer.pipeline import MissionPipeline
-
-MANEUVER_PRESETS = {
-    "SAFE_RCS_PULSE": {"x0": [0.01, 0.01, 0.00], "u_cmd": [0.001, -0.002, 0.001]},
-    "UNSAFE_RCS_PULSE": {"x0": [0.04, 0.03, 0.02], "u_cmd": [0.100, 0.200, 0.150]},
-}
+from producer.pipeline import MANEUVER_PRESETS, MissionPipeline
 
 
 class MissionPlanningAgent:
@@ -18,8 +13,8 @@ class MissionPlanningAgent:
     def propose_maneuver(self, maneuver_type: str = "SAFE_RCS_PULSE") -> dict:
         self._counter += 1
         cmd_id = f"RCS_PULSE_{self._counter:04d}"
-        preset = MANEUVER_PRESETS.get(maneuver_type, {"x0": [0.0, 0.0, 0.0], "u_cmd": [0.0, 0.0, 0.0]})
-        return self.pipeline.run(cmd_id, maneuver_type, preset["x0"], preset["u_cmd"], self.mission_profile)
+        x0 = MANEUVER_PRESETS.get(maneuver_type, {"x0": [0.0, 0.0, 0.0]})["x0"]
+        return self.pipeline.run(cmd_id, maneuver_type, x0, self.mission_profile)
 
 
 if __name__ == "__main__":

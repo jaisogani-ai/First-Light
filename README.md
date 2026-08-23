@@ -30,6 +30,7 @@ This build replaces every one of those with a real implementation, verified end-
 ```
 producer/                     Ground-side: AI mission-planning pipeline
   agent.py                     Mission Planner Agent (maneuver presets)
+  llm_planner.py                Real Claude API call — proposes the torque command itself
   dynamics_model.py             Dynamics Agent's rigid-body propagation engine
   rules.py                      Flight Rules Engine (interface + Rule 1: angular rate)
   certificate.py                 Proof Generator Agent — real Z3 SMT call + Farkas derivation
@@ -61,6 +62,8 @@ Safety limits are not hardcoded. `mission_profiles` (a real DB table, seeded in 
 The producer is not one opaque function call. `producer/pipeline.py` runs five distinct steps — Mission Planner, Dynamics, Safety, Proof Generator, Reviewer — each producing a `{inputs, outputs, latency_ms, confidence, reasoning_summary, status}` record from real numbers (latency via `time.perf_counter()`, confidence as a genuine margin-to-bound ratio). These are persisted to `pipeline_steps` and rendered live in the dashboard's AI Agent Observatory / Multi-Agent Timeline screen.
 
 The Reviewer Agent is a genuine second opinion: it independently recomputes `Σ(λᵢ·cᵢ)` from the certificate the Proof Generator just produced and refuses to let it be signed if the recheck fails — this is a real internal check, not decoration.
+
+**The Mission Planner Agent is a real LLM call**, not deterministic code pretending to be one. `producer/llm_planner.py` sends the current state and mission profile to the Claude API (`claude-opus-5`, via structured outputs) and asks it to propose the actual 3-axis torque command — the numbers that flow into every downstream stage come from the model's response, not a lookup table. This is the PCC principle applied to the producer itself: the AI proposes, the deterministic Dynamics/Safety/Proof Generator/Reviewer chain independently proves — an LLM-proposed maneuver that's actually unsafe is refused by the real Z3/Farkas check exactly like any other input. If `ANTHROPIC_API_KEY` isn't set or the call fails for any reason, the Planner Agent falls back to a deterministic preset and says so plainly in its own reasoning summary (`source: "llm"` vs `source: "deterministic_fallback"` in the pipeline-step record) — it never fabricates a response.
 
 ### Explainable AI and Trust Score
 
