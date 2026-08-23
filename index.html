@@ -29,11 +29,15 @@
             <nav class="nav-menu">
                 <button class="nav-item active" data-screen="orbit">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                    <span>Orbital & Attitude 3D</span>
+                    <span>Flight Digital Twin</span>
                 </button>
                 <button class="nav-item" data-screen="sandbox">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
                     <span>Maneuver Planner</span>
+                </button>
+                <button class="nav-item" data-screen="observatory">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    <span>AI Agent Observatory</span>
                 </button>
                 <button class="nav-item" data-screen="timeline">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -41,15 +45,19 @@
                 </button>
                 <button class="nav-item" data-screen="security">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span>Adversarial Lab</span>
+                    <span>Attack Library</span>
+                </button>
+                <button class="nav-item" data-screen="replay">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9M3 12l4-4M3 12l4 4"/></svg>
+                    <span>Mission Replay</span>
                 </button>
             </nav>
 
             <div class="sidebar-status">
-                <div class="status-indicator online pulse"></div>
+                <div class="status-indicator online pulse" id="ws-status-indicator"></div>
                 <div class="status-details">
-                    <span class="label">cFS Software Bus</span>
-                    <span class="value">MID 0x1808 CONNECTED</span>
+                    <span class="label">Backend WebSocket</span>
+                    <span class="value" id="ws-status-value">CONNECTING</span>
                 </div>
             </div>
         </aside>
@@ -63,14 +71,15 @@
                     <p class="header-sub">Pre-Execution Proof-Carrying Authorization for Spacecraft AI Autonomy</p>
                 </div>
                 <div class="action-bar">
+                    <select id="mission-profile-select" class="btn btn-secondary"></select>
                     <button class="btn btn-secondary" id="btn-trigger-safe">
-                        <span class="btn-icon">▶</span> Run Safe RCS Maneuver
+                        <span class="btn-icon">▶</span> Propose Safe RCS Maneuver
                     </button>
                     <button class="btn btn-warning" id="btn-trigger-unsafe">
-                        <span class="btn-icon">⚠</span> Simulate Unsafe AI Maneuver
+                        <span class="btn-icon">⚠</span> Propose Unsafe AI Maneuver
                     </button>
                     <button class="btn btn-danger" id="btn-trigger-attack">
-                        <span class="btn-icon">⚡</span> Trigger Replay Attack
+                        <span class="btn-icon">⚡</span> Run Replay Attack
                     </button>
                 </div>
             </header>
@@ -133,9 +142,21 @@
                         <span class="stat-meta">Offloaded vs On-Board</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">COMMANDS VERIFIED / DROPPED</span>
-                        <span class="stat-value"><span id="pass-count">142</span> / <span id="drop-count" class="text-red">3</span></span>
-                        <span class="stat-meta">Zero On-Board Violations</span>
+                        <span class="stat-label">COMMANDS VERIFIED / REJECTED</span>
+                        <span class="stat-value"><span id="pass-count">0</span> / <span id="drop-count" class="text-red">0</span></span>
+                        <span class="stat-meta" id="acceptance-meta">Live from /api/evaluation/report</span>
+                    </div>
+                </div>
+
+                <div class="panel" id="trust-panel">
+                    <div class="panel-header">
+                        <h2>Mission Trust Assessment</h2>
+                        <span class="badge" id="trust-overall-badge">—</span>
+                    </div>
+                    <ul class="trust-checklist" id="trust-checklist"></ul>
+                    <div class="farkas-math-box">
+                        <span class="math-title">Explainable AI — why this verdict:</span>
+                        <code class="math-expr" id="explain-narrative">Propose a maneuver to see a live trust assessment.</code>
                     </div>
                 </div>
             </section>
@@ -181,6 +202,19 @@
                 </div>
             </section>
 
+            <!-- Screen: AI Agent Observatory + Multi-Agent Timeline -->
+            <section id="screen-observatory" class="screen-view">
+                <div class="panel feed-panel">
+                    <div class="panel-header">
+                        <h2>Multi-Agent Timeline</h2>
+                        <span class="badge badge-info">Planner → Dynamics → Safety → Proof Generator → Reviewer</span>
+                    </div>
+                    <div class="agent-observatory" id="agent-observatory">
+                        <p class="card-desc">Propose a maneuver to watch each agent's real inputs, outputs, latency, confidence, and reasoning.</p>
+                    </div>
+                </div>
+            </section>
+
             <!-- Screen 3: Telemetry Stream -->
             <section id="screen-timeline" class="screen-view">
                 <div class="panel feed-panel">
@@ -207,35 +241,22 @@
                 </div>
             </section>
 
-            <!-- Screen 4: Adversarial Lab -->
+            <!-- Screen 4: Attack Library -->
             <section id="screen-security" class="screen-view">
-                <div class="security-grid">
-                    <div class="panel attack-card">
-                        <div class="panel-header">
-                            <h2>Scenario A: Hallucinated Unsafe AI Maneuver</h2>
-                            <span class="badge badge-amber">Refused at Z3 Generation</span>
-                        </div>
-                        <p class="card-desc">An AI agent attempts an excessive RCS thruster burn that would cause spacecraft tumble (>0.05 rad/s). Z3 SMT solver fails to find a Farkas proof, so no command is sent.</p>
-                        <button class="btn btn-warning" onclick="document.getElementById('btn-trigger-unsafe').click()">Run Scenario A</button>
-                    </div>
+                <div class="security-grid" id="attack-library-grid">
+                    <p class="card-desc">Loading attack scenarios from the backend…</p>
+                </div>
+            </section>
 
-                    <div class="panel attack-card">
-                        <div class="panel-header">
-                            <h2>Scenario B: Command Hash Mismatch Attack</h2>
-                            <span class="badge badge-danger">Caught at cFS Step 2</span>
-                        </div>
-                        <p class="card-desc">An attacker intercepting the uplink attempts to attach a valid proof to a different unsafe command. SHA-256 hash check fails inside NASA cFS.</p>
-                        <button class="btn btn-danger" onclick="triggerHashMismatch()">Run Scenario B</button>
+            <!-- Screen: Mission Replay -->
+            <section id="screen-replay" class="screen-view">
+                <div class="panel feed-panel">
+                    <div class="panel-header">
+                        <h2>Mission Replay</h2>
+                        <span class="badge badge-info">Every command, proof, rejection, and attack — from the database</span>
                     </div>
-
-                    <div class="panel attack-card">
-                        <div class="panel-header">
-                            <h2>Scenario C: Monotonic Replay Attack</h2>
-                            <span class="badge badge-danger">Caught at cFS Step 1</span>
-                        </div>
-                        <p class="card-desc">An adversary replays a previously accepted valid proof packet. Sequence number comparison (Seq #1043 <= Last #1043) drops packet instantly.</p>
-                        <button class="btn btn-danger" onclick="document.getElementById('btn-trigger-attack').click()">Run Scenario C</button>
-                    </div>
+                    <button class="btn btn-secondary" id="btn-load-replay">Load Mission History</button>
+                    <div id="replay-list"></div>
                 </div>
             </section>
         </main>

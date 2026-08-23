@@ -3,13 +3,14 @@
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import desc, select
 
 from backend.db import engine
 from backend.models import commands, mission_profiles, pipeline_steps, sequence_state
 from backend.persistence import persist_command, persist_pipeline_steps, persist_verification
 from backend.schemas import ExplainData, ProposeRequest, TrustAssessment
+from backend.security import rate_limiter
 from backend.verifier import verify_command
 from backend.ws_manager import ws_manager
 from backend.routers.metrics import COMMANDS_REJECTED, COMMANDS_VERIFIED, PRODUCER_LATENCY, VERIFIER_LATENCY
@@ -17,6 +18,12 @@ from producer.agent import MANEUVER_PRESETS
 from producer.pipeline import MissionPipeline
 
 router = APIRouter(prefix="/api/commands", tags=["commands"])
+
+
+def _enforce_rate_limit(request: Request) -> None:
+    client_key = request.client.host if request.client else "unknown"
+    if not rate_limiter.allow(client_key):
+        raise HTTPException(429, "Rate limit exceeded")
 
 
 def _load_profile(conn, profile_key: str) -> dict:
@@ -32,7 +39,8 @@ def _next_sequence(conn, stream_id: str) -> int:
 
 
 @router.post("/propose")
-def propose(req: ProposeRequest):
+def propose(req: ProposeRequest, request: Request):
+    _enforce_rate_limit(request)
     with engine.begin() as conn:
         profile = _load_profile(conn, req.mission_profile_key)
 
@@ -44,7 +52,8 @@ def propose(req: ProposeRequest):
             return seq_holder["value"]
 
     pipeline = MissionPipeline(allocate_sequence)
-    preset = MANEUVER_PRESETS.get(req.maneuver_type, {"x0": [0.0, 0.0, 0.0], "u_cmd": [0.0, 0.0, 0.0]})
+    default_preset = MANEUVER_PRESETS.get(req.maneuver_type, {"x0": [0.0, 0.0, 0.0], "u_cmd": [0.0, 0.0, 0.0]})
+    preset = {"x0": req.x0 or default_preset["x0"], "u_cmd": req.u_cmd or default_preset["u_cmd"]}
     cmd_id = f"RCS_PULSE_{uuid.uuid4().hex[:8].upper()}"
 
     t0 = time.perf_counter()
@@ -80,12 +89,13 @@ def propose(req: ProposeRequest):
 
 
 @router.post("/verify")
-def verify(body: dict):
+def verify(body: dict, request: Request):
     """Verifies a proof payload against the actual command bytes it claims to cover.
 
     Accepts {command_row_id, proof, submitted_command_id, submitted_u_cmd, mission_profile_key}
     so the Attack Library / adversarial tests can submit tampered payloads directly.
     """
+    _enforce_rate_limit(request)
     proof = body["proof"]
     submitted_command_id = body["submitted_command_id"]
     submitted_u_cmd = body["submitted_u_cmd"]

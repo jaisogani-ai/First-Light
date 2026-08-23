@@ -17,8 +17,25 @@ def verify_command_hash(cmd_bytes: bytes, claimed_hash: str) -> bool:
     return hmac.compare_digest(sha256_hash(cmd_bytes), claimed_hash)
 
 
+def _canonicalize(value):
+    """Coerce every non-bool int to float so an integral-valued float (e.g. multiplier 1.0)
+    hashes identically whether it arrived as a Python float or round-tripped through JSON —
+    JSON (and JS's JSON.stringify) does not distinguish 1 from 1.0, so without this the same
+    certificate would sign differently before and after a network hop."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    if isinstance(value, dict):
+        return {k: _canonicalize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_canonicalize(v) for v in value]
+    return value
+
+
 def compute_hmac_signature(payload_without_signature: dict) -> str:
-    payload_str = json.dumps(payload_without_signature, sort_keys=True)
+    canonical = _canonicalize(payload_without_signature)
+    payload_str = json.dumps(canonical, sort_keys=True)
     sig = hmac.new(settings.hmac_secret_key.encode("utf-8"), payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"hmac_sha256:{sig}"
 

@@ -9,7 +9,6 @@ recompute the exact same arithmetic from the payload alone.
 """
 
 import hashlib
-import hmac
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -17,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import z3
 
-from backend.config import settings
+from backend.security import compute_hmac_signature
 from producer.dynamics_model import SpacecraftDynamics
 from producer.rules import RULE_REGISTRY
 
@@ -68,9 +67,7 @@ class FarkasCertificateGenerator:
             },
         }
 
-        payload_str = json.dumps(cert_payload, sort_keys=True)
-        sig = hmac.new(settings.hmac_secret_key.encode("utf-8"), payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
-        cert_payload["signature"] = f"hmac_sha256:{sig}"
+        cert_payload["signature"] = compute_hmac_signature(cert_payload)
 
         return cert_payload, cmd_bytes, x_post
 

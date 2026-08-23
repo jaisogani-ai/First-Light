@@ -433,4 +433,25 @@ input[type="range"] {
 .status-tag { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
 .status-tag.verified { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
 .status-tag.rejected { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+.status-tag.pending { background: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
+
+/* AI Agent Observatory */
+.agent-observatory { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.agent-card { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-panel); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.agent-card .agent-name { font-weight: 700; font-size: 0.85rem; color: var(--accent-cyan); }
+.agent-card .agent-meta { font-size: 0.72rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+.agent-card .agent-reasoning { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
+.agent-card.refused { border-color: var(--accent-red); }
+.confidence-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.confidence-bar > span { display: block; height: 100%; background: var(--accent-green); }
+
+/* Trust checklist */
+.trust-checklist { list-style: none; padding: 0; margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; }
+.trust-checklist li { font-size: 0.82rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: rgba(255,255,255,0.03); }
+.trust-checklist li.ok { color: var(--accent-green); }
+.trust-checklist li.fail { color: var(--accent-red); }
+
+/* Mission Replay */
+.replay-entry { border-bottom: 1px solid var(--border-panel); padding: 0.85rem 0; font-size: 0.8rem; }
+.replay-entry .replay-head { display: flex; justify-content: space-between; font-family: var(--font-mono); }
 .status-tag.refused { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); }

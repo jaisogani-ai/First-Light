@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from backend.db import init_db
@@ -53,4 +52,11 @@ async def index():
     return FileResponse(REPO_ROOT / "index.html")
 
 
-app.mount("/static", StaticFiles(directory=str(REPO_ROOT)), name="static")
+@app.get("/app.js")
+async def app_js():
+    return FileResponse(REPO_ROOT / "app.js", media_type="application/javascript")
+
+
+@app.get("/styles.css")
+async def styles_css():
+    return FileResponse(REPO_ROOT / "styles.css", media_type="text/css")

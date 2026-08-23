@@ -8,6 +8,8 @@ from pydantic import BaseModel
 class ProposeRequest(BaseModel):
     maneuver_type: str = "SAFE_RCS_PULSE"
     mission_profile_key: str = "earth_observation"
+    x0: list[float] | None = None
+    u_cmd: list[float] | None = None
 
 
 class TrustAssessment(BaseModel):
