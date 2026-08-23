@@ -52,7 +52,7 @@ def propose_torque_llm(maneuver_type: str, x0: list, mission_profile: dict) -> t
         f"yourself, just propose a physically reasonable torque for the stated intent."
     )
     response = client.messages.create(
-        model="claude-opus-5",
+        model="claude-haiku-4-5",
         max_tokens=1024,
         output_config={"format": {"type": "json_schema", "schema": TORQUE_SCHEMA}},
         messages=[{"role": "user", "content": prompt}],

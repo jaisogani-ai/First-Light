@@ -11,7 +11,13 @@ os.environ["FIRST_LIGHT_HMAC_SECRET_KEY"] = "test_only_secret_key_do_not_use_in_
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.main import app  # triggers backend.config's load_dotenv()
+
+# Force the Mission Planner Agent's deterministic fallback path: tests must stay fast,
+# free, offline, and deterministic — not dependent on a real (paid, networked, and
+# non-deterministic) LLM call. backend.config's load_dotenv() may have just populated
+# this from .env; clear it before any test calls propose_torque_llm.
+os.environ.pop("ANTHROPIC_API_KEY", None)
 
 
 @pytest.fixture(scope="session")

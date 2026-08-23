@@ -28,7 +28,9 @@ def _resolve_default_secret_key() -> str:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="FIRST_LIGHT_")
+    # extra="ignore": .env holds vars outside this app's own settings too (e.g.
+    # ANTHROPIC_API_KEY, read directly by the Anthropic SDK, not through this class).
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="FIRST_LIGHT_", extra="ignore")
 
     database_url: str = "sqlite:///./first_light.db"
     hmac_secret_key: str = Field(default_factory=_resolve_default_secret_key)
