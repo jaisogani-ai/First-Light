@@ -1,0 +1,16 @@
+! Real cFE ES startup script for the PCC Gate + Target reference apps.
+!
+! Format: CFE_APP, <AppFile>, <EntryPoint>, <AppName>, <Priority>, <StackSize>, <Load Addr>, <Flags>
+!
+! PCC_GATE_APP MUST start before TARGET_APP so the verifier is subscribed to the raw
+! command MID (0x1808) and ready to republish to the verified MID (0x1809) before the
+! target app subscribes to receive verified commands — otherwise there is a boot-order
+! race where TARGET_APP could miss the first republished command.
+!
+! This file is not consumed by a live cFE build in this repository (see README.md "NASA
+! cFS Integration — Honest Status") — it documents the intended startup ordering for when
+! this reference implementation is built against a real cFE instance, and is parsed for
+! real by eval/test_boot_order.py rather than being a hardcoded string inside the test.
+
+CFE_APP, PCC_GATE_APP, PCC_GateAppMain, PCC_GATE, 50, 8192, 0x0, 0x0;
+CFE_APP, TARGET_APP,   Target_AppMain,  TARGET,   60, 8192, 0x0, 0x0;

@@ -4,7 +4,6 @@
 const API = '';
 let activeProfile = null;
 let profiles = [];
-let lastMissionProfileKey = 'earth_observation';
 
 async function api(path, opts) {
     const res = await fetch(API + path, opts);
@@ -135,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     profileSelect.addEventListener('change', () => {
         activeProfile = profiles.find(p => p.profile_key === profileSelect.value);
-        lastMissionProfileKey = activeProfile.profile_key;
         maxBoundVal = activeProfile.max_omega_rad_s;
         document.getElementById('disp-bound').textContent = `${maxBoundVal.toFixed(3)} rad/s`;
         drawFarkasChart();
@@ -214,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Propose + verify a maneuver (used by header buttons and sandbox)
     // -------------------------------------------------------------
     async function proposeAndVerify(maneuverType, x0, u_cmd) {
+        lastProposeAt = Date.now();
         const body = { maneuver_type: maneuverType, mission_profile_key: activeProfile.profile_key };
         if (x0) body.x0 = x0;
         if (u_cmd) body.u_cmd = u_cmd;
@@ -347,10 +346,24 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'digital_twin_tick') {
-                const t = msg.tick;
-                document.querySelectorAll('.telemetry-pill .pill-val').length; // no-op guard
+                renderDigitalTwinTick(msg.tick);
+            } else if (msg.type === 'verification' || msg.type === 'pipeline_run') {
+                // Another client (or an Attack Library run) changed shared state — keep the feed/stats live.
+                loadFeed(); loadStats();
             }
         };
+    }
+
+    // Live Digital Twin state — only drives the display when the user hasn't just proposed a
+    // maneuver (a real propose/verify result takes priority over the background simulation).
+    let lastProposeAt = 0;
+    function renderDigitalTwinTick(tick) {
+        if (Date.now() - lastProposeAt < 5000) return; // let a fresh verdict stay visible briefly
+        const omegaMag = Math.sqrt(tick.omega_x ** 2 + tick.omega_y ** 2 + tick.omega_z ** 2);
+        currentOmegaVal = omegaMag;
+        satSpinSpeed = Math.min(0.25, omegaMag);
+        document.getElementById('disp-omega').textContent = `${omegaMag.toFixed(4)} rad/s`;
+        drawFarkasChart();
     }
 
     // Init

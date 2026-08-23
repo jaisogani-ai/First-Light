@@ -1,31 +1,20 @@
-"""
-PCC Evaluation Suite: Startup Boot-Order Test
-Verifies that startup sequencing initializes PCC Gate App before Target App.
-"""
+"""Parses the real cFE ES startup script (apps/cfe_es_startup.scr) and confirms
+PCC_GATE_APP is ordered before TARGET_APP — not a hardcoded list duplicated inside the test."""
 
-import unittest
+from pathlib import Path
 
-class TestBootOrder(unittest.TestCase):
-    def test_startup_script_order(self):
-        # Simulate parsing cfe_es_startup.scr
-        startup_script_lines = [
-            "CFE_APP, PCC_GATE_APP, PCC_GateAppMain, PCC_GATE, 50, 8192, 0x0, 0x0;",
-            "CFE_APP, TARGET_APP,   Target_AppMain,  TARGET,   60, 8192, 0x0, 0x0;"
-        ]
+STARTUP_SCRIPT = Path(__file__).resolve().parent.parent / "apps" / "cfe_es_startup.scr"
 
-        gate_index = -1
-        target_index = -1
 
-        for idx, line in enumerate(startup_script_lines):
-            if "PCC_GATE_APP" in line:
-                gate_index = idx
-            if "TARGET_APP" in line:
-                target_index = idx
+def test_gate_app_starts_before_target_app():
+    assert STARTUP_SCRIPT.exists(), f"missing {STARTUP_SCRIPT}"
+    lines = [
+        line for line in STARTUP_SCRIPT.read_text().splitlines()
+        if line.strip().startswith("CFE_APP,")
+    ]
+    assert len(lines) >= 2, "expected at least PCC_GATE_APP and TARGET_APP entries"
 
-        self.assertNotEqual(gate_index, -1)
-        self.assertNotEqual(target_index, -1)
-        self.assertLess(gate_index, target_index, "PCC_GATE_APP must start BEFORE TARGET_APP to prevent boot race")
-        print("[TEST BOOT ORDER] Startup script sequencing verified: Gate App initializes first (PASSED)")
+    gate_index = next(i for i, line in enumerate(lines) if "PCC_GATE_APP" in line)
+    target_index = next(i for i, line in enumerate(lines) if "TARGET_APP" in line)
 
-if __name__ == '__main__':
-    unittest.main()
+    assert gate_index < target_index, "PCC_GATE_APP must start BEFORE TARGET_APP to prevent boot race"

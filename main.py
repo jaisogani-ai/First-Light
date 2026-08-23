@@ -1,17 +1,24 @@
 """
-Proof-Carrying Commands (PCC) for NASA cFS
-Main Integrated Demonstration Entry Point
+Proof-Carrying Commands (PCC) for NASA cFS — CLI demonstration.
+
+Runs the real multi-agent producer pipeline (producer/pipeline.py) and the real verifier
+(backend/verifier.py) against a temporary SQLite database — the same code paths the FastAPI
+backend and eval/ pytest suite use, not a separate reimplementation.
 """
 
-import sys
 import os
-import time
-import json
+import tempfile
 
-# Add producer to python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'producer')))
-from agent import MissionPlanningAgent
-from certificate import FarkasCertificateGenerator
+os.environ.setdefault("FIRST_LIGHT_DATABASE_URL", f"sqlite:///{tempfile.mktemp(suffix='.db')}")
+
+from sqlalchemy import select
+
+from backend.db import engine, init_db
+from backend.models import mission_profiles, sequence_state
+from backend.verifier import verify_command
+from db.seed import seed as seed_profiles
+from producer.agent import MANEUVER_PRESETS, MissionPlanningAgent
+
 
 def run_demonstration():
     print("=" * 70)
@@ -20,55 +27,56 @@ def run_demonstration():
     print("=" * 70)
     print()
 
-    agent = MissionPlanningAgent()
+    init_db()
+    seed_profiles()
+    with engine.connect() as conn:
+        profile = dict(conn.execute(
+            select(mission_profiles).where(mission_profiles.c.profile_key == "earth_observation")
+        ).fetchone()._mapping)
 
-    # Step 1: Propose Safe Maneuver
-    print("[STEP 1] Autonomous AI Agent proposing safe RCS pulse maneuver...")
-    t0 = time.perf_counter()
-    proof, cmd_bytes = agent.propose_maneuver("SAFE_RCS_PULSE")
-    t_producer = (time.perf_counter() - t0) * 1000
+    def allocate_sequence():
+        with engine.begin() as conn:
+            row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == "earth_observation")).fetchone()
+            return (row.last_accepted_sequence if row else 1042) + 1
 
-    print(f" -> Z3 Farkas Certificate Generated in {t_producer:.2f} ms")
-    print(f" -> Command ID: {proof['command_id']}")
-    print(f" -> Command Hash: {proof['command_hash'][:30]}...")
+    agent = MissionPlanningAgent(allocate_sequence, profile)
+
+    print("[STEP 1] Multi-agent producer pipeline proposing a safe RCS pulse maneuver...")
+    result = agent.propose_maneuver("SAFE_RCS_PULSE")
+    for step in result["steps"]:
+        print(f"  [{step['agent_name']}] {step['reasoning_summary']} ({step['latency_ms']:.3f} ms)")
+
+    if result["refused"]:
+        print(f"\n [REFUSED] {result['refusal_reason']}")
+        return
+
+    proof = result["proof"]
+    u_cmd = MANEUVER_PRESETS["SAFE_RCS_PULSE"]["u_cmd"]
+    print(f"\n -> Farkas Multipliers: {proof['certificate']['multipliers']}")
     print(f" -> Sequence No: {proof['sequence_no']}")
-    print(f" -> Farkas Multipliers: {proof['certificate']['multipliers']}")
-    print()
 
-    # Step 2: Simulate NASA cFS Gate App Verification
-    print("[STEP 2] Sending command + proof payload to NASA cFS Gate App (MID 0x1808)...")
-    t_v0 = time.perf_counter()
-    
-    # 5-Step Verifier Simulation
-    seq_ok = proof["sequence_no"] > 1042
-    hash_ok = proof["command_hash"].startswith("sha256:")
-    sig_ok = proof["signature"].startswith("hmac_sha256:")
-    model_ok = proof["model_id"] == "linear_rigid_body_v1"
-    
-    multipliers = proof["certificate"]["multipliers"]
-    sum_val = sum(m * 0.01 for m in multipliers) - 0.014
-    farkas_ok = sum_val < 0.0
+    print("\n[STEP 2] Sending command + proof payload to the real 5-step verifier...")
+    cmd_bytes = f"{proof['command_id']}:{u_cmd[0]}:{u_cmd[1]}:{u_cmd[2]}".encode("utf-8")
+    with engine.begin() as conn:
+        verdict = verify_command(conn, proof, cmd_bytes, stream_id="earth_observation")
 
-    t_verifier = (time.perf_counter() - t_v0) * 1000
+    print(f" -> Verifier completed in {verdict.verifier_time_ms:.4f} ms")
+    print(f"    Trust: {verdict.trust.model_dump()}")
 
-    print(f" -> cFS Gate 5-Step Verification Routine completed in {t_verifier:.4f} ms!")
-    print(f"    1. Sequence Freshness: {'[PASS]' if seq_ok else '[FAIL]'}")
-    print(f"    2. Command Hash Match: {'[PASS]' if hash_ok else '[FAIL]'}")
-    print(f"    3. Signature Valid:   {'[PASS]' if sig_ok else '[FAIL]'}")
-    print(f"    4. Model Version Match:{'[PASS]' if model_ok else '[FAIL]'}")
-    print(f"    5. Farkas Inequality:  {'[PASS]' if farkas_ok else '[FAIL]'}")
-
-    if seq_ok and hash_ok and sig_ok and model_ok and farkas_ok:
-        print()
-        print(" [SUCCESS] COMMAND VERIFIED BY cFS GATE APP! Republished to Exec MID 0x1809.")
-        print(f"           Computational Asymmetry: Producer {t_producer:.1f}ms vs Verifier {t_verifier:.4f}ms ({int(t_producer/t_verifier)}x faster)")
+    producer_time_ms = sum(s["latency_ms"] for s in result["steps"])
+    if verdict.verdict == "VERIFIED":
+        print(f"\n [SUCCESS] COMMAND VERIFIED! {verdict.explain.narrative}")
+        print(f"           Computational Asymmetry: Producer {producer_time_ms:.2f}ms vs "
+              f"Verifier {verdict.verifier_time_ms:.4f}ms "
+              f"({producer_time_ms / verdict.verifier_time_ms:.1f}x faster)")
     else:
-        print("\n [REJECTED] Command failed verification.")
+        print(f"\n [REJECTED] {verdict.reject_reason}")
 
     print()
     print("=" * 70)
-    print("  To view the interactive Mission Control Dashboard, open index.html in your browser")
+    print("  For the interactive Mission Control Dashboard: uvicorn backend.main:app --reload")
     print("=" * 70)
+
 
 if __name__ == "__main__":
     run_demonstration()

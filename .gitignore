@@ -1,4 +1,5 @@
 .env
+.pcc_secret_key
 *.db
 __pycache__/
 *.pyc
