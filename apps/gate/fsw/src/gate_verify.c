@@ -1,30 +1,32 @@
 /*
 ** NASA core Flight Software (cFS) Gate Application
-** Pure C Deterministic 5-Step PCC Verifier Engine
+** Pure C Deterministic 5-Step PCC Verifier Engine — reference implementation.
+**
+** Mirrors backend/verifier.py's checks using real SHA-256/HMAC-SHA256 (see pcc_crypto.c),
+** not the XOR/marker mocks the earlier version of this file used. It has not been built or
+** exercised under a live NASA cFE/Software Bus instance in this repository — see the cFS
+** integration note in README.md for exactly what was and wasn't achieved and why.
 */
 
 #include "gate_app.h"
+#include "pcc_crypto.h"
 #include <string.h>
+#include <stddef.h>
 
 PCC_GlobalState_t CFE_PCC_GlobalState = { .last_seq_no = 1042, .verified_count = 0, .rejected_count = 0 };
 
-/* Mock SHA256 for standalone / cFS environment */
-static void Mock_SHA256(const uint8 *pData, uint16 Len, uint8 *pOutHash)
-{
-    memset(pOutHash, 0, 32);
-    for (uint16 i = 0; i < Len; i++) {
-        pOutHash[i % 32] ^= pData[i];
-    }
-}
+/* Demo-only shared key. A flight build would source this from a provisioned key store, not
+   a compiled-in constant — this mirrors backend/config.py's HMAC_SECRET_KEY for the demo. */
+static const uint8 PCC_DEMO_HMAC_KEY[] = "NASA_cFS_PCC_DEMO_KEY_DO_NOT_USE_IN_FLIGHT";
 
-/* Mock Signature Check */
-static int32 Mock_VerifySig(const PCC_Cert_t *pCert)
+static int32 PCC_VerifySignature(const PCC_Cert_t *pCert)
 {
-    /* In actual cFS: Ed25519 or HMAC-SHA256 signature verification */
-    if (pCert->signature[0] == 0xFF && pCert->signature[1] == 0xFF) {
-        return -1; // Forged signature marker
-    }
-    return 0; // Valid
+    uint8 expected[32];
+    /* Signs the fixed-layout certificate fields as raw bytes (a flight build would sign the
+       canonical serialized payload, matching the Python producer's JSON-based signing). */
+    PCC_HMAC_SHA256(PCC_DEMO_HMAC_KEY, sizeof(PCC_DEMO_HMAC_KEY) - 1,
+                     (const uint8 *)pCert, offsetof(PCC_Cert_t, signature), expected);
+    return memcmp(expected, pCert->signature, 32) == 0 ? 0 : -1;
 }
 
 int32 PCC_VerifyCommand(PCC_Cert_t *pCert, const uint8 *pCmdBytes, uint16 CmdLen)
@@ -35,16 +37,16 @@ int32 PCC_VerifyCommand(PCC_Cert_t *pCert, const uint8 *pCmdBytes, uint16 CmdLen
         return PCC_VERIFY_REPLAY_FAIL;
     }
 
-    /* Step 2: Command Hash Verification */
+    /* Step 2: Command Hash Verification (real SHA-256) */
     uint8 computed_hash[32];
-    Mock_SHA256(pCmdBytes, CmdLen, computed_hash);
+    PCC_SHA256(pCmdBytes, CmdLen, computed_hash);
     if (memcmp(computed_hash, pCert->command_hash, 32) != 0) {
         CFE_PCC_GlobalState.rejected_count++;
         return PCC_VERIFY_HASH_MISMATCH;
     }
 
-    /* Step 3: Signature Verification */
-    if (Mock_VerifySig(pCert) != 0) {
+    /* Step 3: Signature Verification (real HMAC-SHA256) */
+    if (PCC_VerifySignature(pCert) != 0) {
         CFE_PCC_GlobalState.rejected_count++;
         return PCC_VERIFY_SIG_FAIL;
     }
