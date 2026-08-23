@@ -1,0 +1,14 @@
+services:
+  first-light:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - first-light-data:/data
+    environment:
+      - FIRST_LIGHT_HMAC_SECRET_KEY=${FIRST_LIGHT_HMAC_SECRET_KEY:?set a real secret in .env}
+
+volumes:
+  first-light-data:
