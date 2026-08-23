@@ -49,6 +49,8 @@ def persist_pipeline_steps(conn, command_row_id: int | None, run_id: str, steps:
             confidence=step["confidence"],
             reasoning_summary=step["reasoning_summary"],
             status=step["status"],
+            dependencies_json=json.dumps(step.get("dependencies", [])),
+            step_timestamp=step.get("timestamp"),
         ))
 
 

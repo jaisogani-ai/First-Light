@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS pipeline_steps (
     confidence                REAL NOT NULL,
     reasoning_summary          TEXT NOT NULL,
     status                    TEXT NOT NULL,
+    dependencies_json          TEXT NOT NULL DEFAULT '[]',
+    step_timestamp               TEXT,
     created_at                TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

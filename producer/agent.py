@@ -1,6 +1,7 @@
 """Mission Planner Agent entry point — thin convenience wrapper around the full producer
 pipeline (see producer/pipeline.py for the Planner/Dynamics/Safety/Proof/Reviewer chain)."""
 
+from backend.constants import INITIAL_SEQUENCE_NO
 from producer.pipeline import MANEUVER_PRESETS, MissionPipeline
 
 
@@ -18,7 +19,7 @@ class MissionPlanningAgent:
 
 
 if __name__ == "__main__":
-    counter = {"n": 1042}
+    counter = {"n": INITIAL_SEQUENCE_NO}
 
     def _seq():
         counter["n"] += 1

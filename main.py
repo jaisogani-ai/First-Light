@@ -13,6 +13,7 @@ os.environ.setdefault("FIRST_LIGHT_DATABASE_URL", f"sqlite:///{tempfile.mktemp(s
 
 from sqlalchemy import select
 
+from backend.constants import INITIAL_SEQUENCE_NO
 from backend.db import engine, init_db
 from backend.models import mission_profiles, sequence_state
 from backend.verifier import verify_command
@@ -37,7 +38,7 @@ def run_demonstration():
     def allocate_sequence():
         with engine.begin() as conn:
             row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == "earth_observation")).fetchone()
-            return (row.last_accepted_sequence if row else 1042) + 1
+            return (row.last_accepted_sequence if row else INITIAL_SEQUENCE_NO) + 1
 
     agent = MissionPlanningAgent(allocate_sequence, profile)
 

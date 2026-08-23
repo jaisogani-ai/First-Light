@@ -18,7 +18,12 @@ def steps_for_run(run_id: str):
         rows = conn.execute(
             select(pipeline_steps).where(pipeline_steps.c.run_id == run_id).order_by(pipeline_steps.c.step_order)
         ).fetchall()
-    return [dict(r._mapping) for r in rows]
+    steps = []
+    for r in rows:
+        d = dict(r._mapping)
+        d["dependencies"] = json.loads(d.pop("dependencies_json") or "[]")
+        steps.append(d)
+    return steps
 
 
 @router.get("/graph")

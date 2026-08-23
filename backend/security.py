@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import threading
 import time
 from collections import defaultdict
 
@@ -48,19 +49,41 @@ def verify_signature(proof: dict) -> bool:
 
 
 class RateLimiter:
-    """Fixed-window in-memory limiter, per client key. No external dependency."""
+    """Sliding-window in-memory limiter, per client key. No external dependency.
+
+    FastAPI's sync (`def`, not `async def`) routes run in a real threadpool, so this is
+    genuinely accessed from multiple OS threads concurrently — a lock is required, not
+    optional. Keys with no hits left in the window are dropped rather than kept as an
+    empty list, so long-running processes don't accumulate one dict entry per distinct
+    client IP ever seen (an unbounded memory leak otherwise)."""
 
     def __init__(self, limit_per_minute: int = 60):
         self.limit = limit_per_minute
         self._hits: dict[str, list[float]] = defaultdict(list)
+        self._lock = threading.Lock()
 
     def allow(self, key: str) -> bool:
         now = time.time()
         window_start = now - 60.0
-        hits = [t for t in self._hits[key] if t > window_start]
-        hits.append(now)
-        self._hits[key] = hits
-        return len(hits) <= self.limit
+        with self._lock:
+            hits = [t for t in self._hits[key] if t > window_start]
+            hits.append(now)
+            if len(hits) > self.limit:
+                self._hits[key] = hits
+                return False
+            self._hits[key] = hits
+            return True
+
+    def prune(self) -> int:
+        """Drops keys with no hits left in the current window. Call periodically (not on
+        every request, to keep allow() cheap) to bound memory across long uptimes."""
+        now = time.time()
+        window_start = now - 60.0
+        with self._lock:
+            stale = [k for k, hits in self._hits.items() if not any(t > window_start for t in hits)]
+            for k in stale:
+                del self._hits[k]
+            return len(stale)
 
 
 rate_limiter = RateLimiter(settings.rate_limit_per_minute)

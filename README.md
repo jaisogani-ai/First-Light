@@ -43,16 +43,22 @@ producer/                     Ground-side: AI mission-planning pipeline
   dynamics_model.py             Dynamics Agent's rigid-body propagation engine
   rules.py                      Flight Rules Engine (interface + Rule 1: angular rate)
   certificate.py                 Proof Generator Agent — real Z3 SMT call + Farkas derivation
-  pipeline.py                    Orchestrates all 5 agents, records per-step telemetry
+  pipeline.py                    Orchestrates all 5 agents, computes real per-step dependencies
+  orbit.py                        Real SGP4 orbit propagation — mission context only, §11
 
 backend/                      Spacecraft-side (reference) + application backend
-  verifier.py                    The real 5-step verifier (hash/sig/sequence/model/Farkas)
-  security.py                     SHA-256, HMAC-SHA256, canonicalization, rate limiting
+  verifier.py                    The real 5-step verifier (hash/sig/sequence/model/Farkas),
+                                  race-free sequence check via atomic SQL upsert
+  security.py                     SHA-256, HMAC-SHA256, canonicalization, thread-safe
+                                  bounded rate limiting
   digital_twin.py                  Physics-based telemetry simulator (Flight Digital Twin)
-  attack_mutations.py               Shared attack definitions (Attack Library + eval/ tests)
-  routers/                          commands, pipeline, profiles, replay, attacks, telemetry,
-                                     evaluation, metrics — the full REST + WebSocket API
-  db.py, models.py                   SQLAlchemy Core over db/schema.sql
+  audit_chain.py                    Tamper-evident hash-chain audit log, §
+  pipeline_graph.py                  Real dependency graph from actual step data, §
+  attack_mutations.py                 Shared attack definitions (Attack Library + eval/ tests)
+  constants.py                         Shared constants (e.g. the sequence genesis value)
+  routers/                              commands, pipeline, profiles, replay, attacks, telemetry,
+                                         evaluation, metrics, audit, orbit — the full REST + WS API
+  db.py, models.py                       SQLAlchemy Core over db/schema.sql
 
 apps/gate, apps/target        cFS-pattern C reference verifier — see §6, not a live cFE build
 db/schema.sql                 Source-of-truth SQLite schema (SQLite only, no ORM migrations)
@@ -171,7 +177,50 @@ pytest eval/ -v                 # full adversarial suite against the live backen
 cd docker && docker compose up --build
 ```
 
-## 11. Limitations
+## 11. Mission Planning Orbit Support
+
+`producer/orbit.py` adds real SGP4 orbit propagation via the `sgp4` package (the standard Vallado/NORAD implementation used to process real TLEs) to supply **mission context** — position, ground track, visibility windows to a ground station, orbital period — to the operator and Mission Planner Agent. It does **not** touch the locked Farkas/Z3 safety verification in any way; the research contribution stays command verification, and orbit propagation only informs when/how a maneuver might be planned.
+
+Ground-track and visibility geometry use a spherical-Earth approximation (mean radius 6378.137 km), not the full WGS84 ellipsoid — an explicit, honest scoping decision (error is at most ~0.3% of Earth's radius, immaterial for mission context display but not survey-grade). Correctness is checked against known physical facts about a real published ISS TLE (orbital inclination ±51.6°, altitude ~400 km, period ~92–93 minutes) in `eval/test_orbit.py`, rather than exact reference-ephemeris matching. `POST /api/orbit/propagate`, `/period`, `/ground-track`, and `/visibility` accept any two-line element set.
+
+## 12. Self-Review
+
+This project went through an internal adversarial audit specifically looking for what a NASA/IEEE/DARPA reviewer would flag. Findings and their disposition, in full:
+
+**Fixed as a direct result of the audit:**
+- **A real TOCTOU race in sequence/replay checking** (`backend/verifier.py`): the freshness check read `last_accepted_sequence`, decided in Python, then wrote — two concurrent `verify()` calls could both read the same value and both be accepted, a genuine failure of the replay-protection property. Fixed with an atomic `INSERT ... ON CONFLICT DO UPDATE ... WHERE` (a single statement SQLite executes atomically, so only one concurrent caller can ever win). Verified two ways: `eval/test_sequence_race.py` fires 25 concurrent identical requests and asserts exactly one is accepted; the fix was also confirmed to actually matter by temporarily reverting it and re-running the test — the old code crashed with an unhandled `IntegrityError` under real concurrency.
+- **An unexplained magic constant** (`1042`, scattered across 5 files): replaced with `backend.constants.INITIAL_SEQUENCE_NO`, a documented, obviously-arbitrary genesis value.
+- **Dead, inconsistent code**: `backend/verifier.py`'s unused `DEFAULT_STREAM_ID = "default"` default parameter (every real caller already passed an explicit stream id, but a future omission would have silently checked the wrong stream) — removed; `stream_id` is now a required parameter.
+- **Unbounded rate-limiter memory growth and a real thread-safety gap** (`backend/security.py`): FastAPI's sync routes run in a real threadpool, so the limiter's dict was genuinely accessed from multiple OS threads with no lock. Added a lock and a `prune()` method, called every 5 minutes from a background task in `backend/main.py`.
+- **A synchronous DB write blocking the async event loop once per second** (`backend/routers/telemetry.py`'s Digital Twin loop) — offloaded via `asyncio.to_thread`.
+
+**Remaining weaknesses (not yet fixed, tracked honestly):**
+- Z3's role is narrower than the phrase "Z3-derived Farkas certificates" implies: `producer/certificate.py` pins `z3.Real` variables to already-computed concrete values and checks UNSAT of a disjunction — a real SMT call, but it confirms a numeric fact rather than searching for or deriving the Farkas multipliers, which come from the closed-form one-hot construction in `producer/rules.py`. Z3 is a genuine independent oracle here, not the source of the certificate's numbers.
+- The Mission Planner Agent's real LLM call is not exercised by the default CI test run (`eval/conftest.py` deliberately clears `ANTHROPIC_API_KEY` so the suite stays fast/free/offline/deterministic) — only the fallback path has automated coverage. An opt-in test gated on the key's presence would close this gap.
+- `apps/gate`'s C reference verifier has still never run inside a live cFE/Software Bus instance (honestly disclosed since §6 was written; the blocker is the same one — no Linux/CYGWIN build host in this environment).
+- The C reference verifier's HMAC key remains a compiled-in demo constant.
+- The audit_chain table has a UNIQUE index on `sequence_index` as a fail-safe (a concurrent double-append raises a real `IntegrityError` rather than silently succeeding), but does not yet use the same atomic-upsert pattern as the sequence-freshness fix above — lower priority since a raised exception is a safe failure mode, not a silent one, but not proven race-free under load the way sequence freshness now is.
+
+**Assumptions worth naming explicitly:**
+- Single mission stream / SQLite single-writer is baked into the transaction pattern itself, not just the database choice — a future Postgres migration would need to re-verify the same atomicity properties, not just swap the connection string.
+- The one-hot Farkas multiplier construction is provably sound *only* because `AngularRateRule` is independent per-axis box bounds with a unique binding maximum. It does not generalize to coupled constraints (e.g. total momentum magnitude, cross-axis rules) — any future Flight Rule that isn't a simple box bound needs a different multiplier-derivation approach, not just an interface implementation.
+- Producer and verifier share one static, symmetric HMAC secret with no rotation — anyone who reads either side's key can forge certificates. This is standard for a hackathon demo but would not survive a real security review.
+- The certificate's 30-second validity window assumes producer→verifier latency is always well under that and that both sides' clocks agree — trivially true today since both run on one host.
+
+**Simulations vs. reality, in full:**
+- **Real**: Z3 UNSAT confirmation (narrow role, above); SHA-256/HMAC-SHA256 (RFC-vector tested in both Python and C); SQLite persistence via SQLAlchemy Core; the 5-agent pipeline's measured latency/confidence/dependencies; the Claude Haiku API call code path (real, but CI-untested per above); the tamper-evident hash chain with independent recomputation; the pipeline dependency graph (computed from actual step data, not drawn); SGP4 orbit propagation; Prometheus metrics and live `psutil` process stats; 26 passing pytest tests against a live `TestClient`, including a genuine concurrency test.
+- **Simulated, honestly labeled everywhere it appears**: `backend/digital_twin.py`'s thermal/battery/comm-delay/sensor-latency models (hand-picked constants, not sourced from any spacecraft datasheet); the Attack Library's seven scenarios (hand-written mutations, not recorded attack traffic — a real replacement dataset is named in §1); the four `mission_profiles` (authored archetypes, not real mission specs); `apps/gate`'s C verifier (never run under live cFE).
+
+**Future work, concretely scoped:**
+1. Extend the atomic-upsert pattern from sequence freshness to `audit_chain` appends.
+2. Implement the six named-but-missing Flight Rules — for any non-box-constraint rule, first generalize multiplier derivation beyond the one-hot construction (real LP-dual or Z3 `unsat_core`-based extraction).
+3. Add opt-in CI coverage for the real LLM path, gated on `ANTHROPIC_API_KEY` presence.
+4. Complete a Linux/CYGWIN native cFS build so `apps/gate`/`apps/target` run against real cFE/OSAL/PSP over the Software Bus — the C verifier logic itself needs no change.
+5. Move the C verifier's compiled-in demo HMAC key to a provisioned key store.
+6. Replace synthetic Attack Library scenarios with (or supplement using) the real labeled CubeSat attack dataset named in §1.
+7. Feed real orbit-derived context (next visibility window, current ground track) into the Mission Planner Agent's LLM prompt, so proposals can reference actual mission timing — currently the orbit module and the pipeline are wired to the same API but not yet to each other.
+
+## 13. Limitations
 
 - Not flight-qualified software; not certified under any space agency safety standard (NASA-STD-8719.13, DO-178C, ECSS-E-ST-40C). See `docs/SAFETY_DISCLAIMER.md`.
 - No live NASA cFE/Software Bus build in this repository — see §6.
@@ -181,6 +230,7 @@ cd docker && docker compose up --build
 - The C reference verifier's HMAC key is a compiled-in demo constant, explicitly not suitable for flight use (see the comment in `apps/gate/fsw/src/gate_verify.c`).
 - The Attack Library's seven scenarios are synthetically constructed mutations, not recorded real-world attack traffic — see §1's Related Work for a named, real dataset that could replace them.
 - The Mission Planner Agent's LLM call (`producer/llm_planner.py`) is unvalidated beyond "does it produce a parseable, safety-checked proposal" — there is no adversarial or distributional testing of what Claude actually proposes across a wide input range, only confirmation that the downstream deterministic pipeline safely handles whatever it returns.
+- Ground-track/visibility geometry (§11) uses a spherical-Earth approximation, not full WGS84 — see §11 for the honest error bound.
 
 ## License
 

@@ -25,7 +25,7 @@ void PCC_GateAppMain(void)
        construction in producer/rules.py rather than being independently made up. */
     memset(&cert, 0, sizeof(cert));
     strncpy(cert.command_id, "RCS_PULSE_0043", 32);
-    cert.sequence_no = 1043;
+    cert.sequence_no = 1001;
     cert.model_version = 1;
     cert.constraint_count = 1;
     cert.multipliers[0] = 1.0f;

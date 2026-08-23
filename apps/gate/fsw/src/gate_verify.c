@@ -13,7 +13,9 @@
 #include <string.h>
 #include <stddef.h>
 
-PCC_GlobalState_t CFE_PCC_GlobalState = { .last_seq_no = 1042, .verified_count = 0, .rejected_count = 0 };
+/* Genesis sequence number — arbitrary but documented (matches backend/constants.py's
+   INITIAL_SEQUENCE_NO=1000; the sample cert below uses 1001). */
+PCC_GlobalState_t CFE_PCC_GlobalState = { .last_seq_no = 1000, .verified_count = 0, .rejected_count = 0 };
 
 /* Demo-only shared key. A flight build would source this from a provisioned key store, not
    a compiled-in constant — this mirrors backend/config.py's HMAC_SECRET_KEY for the demo. */

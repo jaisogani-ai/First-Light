@@ -8,11 +8,19 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from backend.db import init_db
-from backend.routers import attacks, audit, commands, evaluation, metrics, pipeline, profiles, replay, telemetry
+from backend.routers import attacks, audit, commands, evaluation, metrics, orbit, pipeline, profiles, replay, telemetry
+from backend.security import rate_limiter
 from backend.ws_manager import ws_manager
 from db.seed import seed as seed_profiles
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+RATE_LIMITER_PRUNE_SECONDS = 300
+
+
+async def _prune_rate_limiter_periodically():
+    while True:
+        await asyncio.sleep(RATE_LIMITER_PRUNE_SECONDS)
+        await asyncio.to_thread(rate_limiter.prune)
 
 
 @asynccontextmanager
@@ -21,7 +29,9 @@ async def lifespan(app: FastAPI):
     seed_profiles()
     ws_manager.set_loop(asyncio.get_running_loop())
     await telemetry.start_digital_twin()
+    prune_task = asyncio.create_task(_prune_rate_limiter_periodically())
     yield
+    prune_task.cancel()
     await telemetry.stop_digital_twin()
 
 
@@ -36,6 +46,7 @@ app.include_router(telemetry.router)
 app.include_router(evaluation.router)
 app.include_router(metrics.router)
 app.include_router(audit.router)
+app.include_router(orbit.router)
 
 
 @app.websocket("/ws")

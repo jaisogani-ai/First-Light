@@ -16,13 +16,13 @@ import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from backend.models import sequence_state
 from backend.schemas import ExplainData, TrustAssessment
 from backend.security import verify_command_hash, verify_signature
 
 ACCEPTED_MODEL_IDS = {"linear_rigid_body_v1"}
-DEFAULT_STREAM_ID = "default"
 
 
 class VerificationResult:
@@ -34,17 +34,21 @@ class VerificationResult:
         self.explain = explain
 
 
-def verify_command(conn, proof: dict, cmd_bytes: bytes, stream_id: str = DEFAULT_STREAM_ID) -> VerificationResult:
+def verify_command(conn, proof: dict, cmd_bytes: bytes, stream_id: str) -> VerificationResult:
     t0 = time.perf_counter()
 
-    row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == stream_id)).fetchone()
-    last_accepted = row.last_accepted_sequence if row else 0
+    # Read-only, for the human-facing explain/reject_reason ordering below — NOT the value
+    # that gates acceptance. A plain SELECT here can be stale under concurrent requests;
+    # that's fine for a diagnostic message but would be a real replay hole if used to decide
+    # whether to accept (see the atomic compare-and-swap below for the actual decision).
+    diag_row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == stream_id)).fetchone()
+    diag_last_accepted = diag_row.last_accepted_sequence if diag_row else 0
 
     now = datetime.now(timezone.utc)
     valid_from = datetime.fromisoformat(proof["valid_from"])
     valid_until = datetime.fromisoformat(proof["valid_until"])
     window_ok = valid_from <= now <= valid_until
-    sequence_ok = (proof["sequence_no"] > last_accepted) and window_ok
+    sequence_diagnostic_ok = (proof["sequence_no"] > diag_last_accepted) and window_ok
 
     hash_ok = verify_command_hash(cmd_bytes, proof["command_hash"])
     signature_ok = verify_signature(proof)
@@ -65,23 +69,35 @@ def verify_command(conn, proof: dict, cmd_bytes: bytes, stream_id: str = DEFAULT
     max_constraint = max(constraints) if constraints else 0.0
     farkas_ok = all_nonneg and abs(recomputed_sum - max_constraint) < 1e-9 and max_constraint < 0.0
 
-    overall_ok = sequence_ok and hash_ok and signature_ok and model_ok and farkas_ok
+    non_sequence_ok = window_ok and hash_ok and signature_ok and model_ok and farkas_ok
 
-    if overall_ok:
-        if row:
-            conn.execute(
-                sequence_state.update()
-                .where(sequence_state.c.stream_id == stream_id)
-                .values(last_accepted_sequence=proof["sequence_no"], updated_at=now.isoformat())
-            )
-        else:
-            conn.execute(sequence_state.insert().values(
-                stream_id=stream_id, last_accepted_sequence=proof["sequence_no"], updated_at=now.isoformat()
-            ))
+    # Sequence freshness is the one check with shared mutable state, so it's the one check
+    # that must be atomic against concurrent verify() calls. A plain read-then-write (SELECT
+    # last_accepted_sequence, decide in Python, then UPDATE) is a TOCTOU race: two concurrent
+    # requests can both read the same last_accepted_sequence and both decide "fresh" before
+    # either write lands, double-accepting a stream where the second should be rejected as a
+    # replay. INSERT ... ON CONFLICT DO UPDATE ... WHERE is a single statement SQLite executes
+    # atomically — the freshness check and the write happen as one operation, so only one
+    # concurrent caller can ever win for a given sequence_no. Only attempted when every other
+    # check already passed, so an invalid certificate can never burn a future legitimate
+    # sequence number.
+    sequence_ok = False
+    if non_sequence_ok:
+        stmt = sqlite_insert(sequence_state).values(
+            stream_id=stream_id, last_accepted_sequence=proof["sequence_no"], updated_at=now.isoformat(),
+        ).on_conflict_do_update(
+            index_elements=[sequence_state.c.stream_id],
+            set_={"last_accepted_sequence": proof["sequence_no"], "updated_at": now.isoformat()},
+            where=(sequence_state.c.last_accepted_sequence < proof["sequence_no"]),
+        )
+        result = conn.execute(stmt)
+        sequence_ok = result.rowcount == 1
+
+    overall_ok = non_sequence_ok and sequence_ok
 
     reject_reason = None
     failing_step = None
-    if not sequence_ok:
+    if not sequence_diagnostic_ok:
         reject_reason = "Sequence freshness check failed (replay or stale window)"
         failing_step = "Sequence Freshness"
     elif not hash_ok:
@@ -96,6 +112,11 @@ def verify_command(conn, proof: dict, cmd_bytes: bytes, stream_id: str = DEFAULT
     elif not farkas_ok:
         reject_reason = "Farkas inequality does not hold for the submitted multipliers/constraints"
         failing_step = "Farkas Inequality"
+    elif not sequence_ok:
+        # Everything else was genuinely valid, but this request lost a real concurrent race
+        # for the sequence number — a correct rejection, not a bug.
+        reject_reason = "Sequence freshness check failed (lost a concurrent race for this sequence number)"
+        failing_step = "Sequence Freshness"
 
     max_omega = proof["bound"]["max_rad_s"]
     binding_value = max(constraints) if constraints else 0.0

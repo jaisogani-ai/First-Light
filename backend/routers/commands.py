@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import desc, select
 
+from backend.constants import INITIAL_SEQUENCE_NO
 from backend.db import engine
 from backend.models import commands, mission_profiles, pipeline_steps, sequence_state
 from backend.persistence import persist_command, persist_pipeline_steps, persist_verification
@@ -35,7 +36,7 @@ def _load_profile(conn, profile_key: str) -> dict:
 
 def _next_sequence(conn, stream_id: str) -> int:
     row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == stream_id)).fetchone()
-    return (row.last_accepted_sequence if row else 1042) + 1
+    return (row.last_accepted_sequence if row else INITIAL_SEQUENCE_NO) + 1
 
 
 @router.post("/propose")

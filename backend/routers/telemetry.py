@@ -18,20 +18,28 @@ _task: asyncio.Task | None = None
 TICK_SECONDS = 1.0
 
 
+def _write_tick(tick: dict) -> None:
+    with engine.begin() as conn:
+        conn.execute(telemetry.insert().values(
+            spacecraft_id=None,
+            omega_x=tick["omega_x"], omega_y=tick["omega_y"], omega_z=tick["omega_z"],
+            reaction_wheel_momentum=tick["reaction_wheel_momentum"],
+            battery_soc_pct=tick["battery_soc_pct"],
+            temperature_c=tick["temperature_c"],
+            power_draw_w=tick["power_draw_w"],
+            comm_delay_ms=tick["comm_delay_ms"],
+            sensor_latency_ms=tick["sensor_latency_ms"],
+        ))
+
+
 async def _loop():
     while True:
         tick = _twin.step(dt=TICK_SECONDS)
-        with engine.begin() as conn:
-            conn.execute(telemetry.insert().values(
-                spacecraft_id=None,
-                omega_x=tick["omega_x"], omega_y=tick["omega_y"], omega_z=tick["omega_z"],
-                reaction_wheel_momentum=tick["reaction_wheel_momentum"],
-                battery_soc_pct=tick["battery_soc_pct"],
-                temperature_c=tick["temperature_c"],
-                power_draw_w=tick["power_draw_w"],
-                comm_delay_ms=tick["comm_delay_ms"],
-                sensor_latency_ms=tick["sensor_latency_ms"],
-            ))
+        # The DB write is synchronous SQLAlchemy Core — running it directly in this
+        # coroutine would block the whole event loop (every other request, every other
+        # WebSocket) for the duration of the write, once per second. asyncio.to_thread
+        # offloads it to the default threadpool instead.
+        await asyncio.to_thread(_write_tick, tick)
         ws_manager.broadcast_nowait({"type": "digital_twin_tick", "tick": tick})
         await asyncio.sleep(TICK_SECONDS)
 

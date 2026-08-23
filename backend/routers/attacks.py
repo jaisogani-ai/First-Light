@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from backend.attack_mutations import ATTACK_TYPES, apply_attack
+from backend.constants import INITIAL_SEQUENCE_NO
 from backend.db import engine
 from backend.models import mission_profiles, security_events
 from backend.persistence import persist_command, persist_pipeline_steps, persist_verification
@@ -44,7 +45,7 @@ def run_attack(req: AttackRequest):
         from backend.models import sequence_state
         with engine.begin() as conn:
             row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == req.mission_profile_key)).fetchone()
-            seq_holder["value"] = (row.last_accepted_sequence if row else 1042) + 1
+            seq_holder["value"] = (row.last_accepted_sequence if row else INITIAL_SEQUENCE_NO) + 1
             return seq_holder["value"]
 
     pipeline = MissionPipeline(allocate_sequence)

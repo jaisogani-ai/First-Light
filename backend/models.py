@@ -75,6 +75,8 @@ pipeline_steps = Table(
     Column("confidence", Float),
     Column("reasoning_summary", Text),
     Column("status", String),
+    Column("dependencies_json", Text),
+    Column("step_timestamp", String),
     Column("created_at", String),
 )
 
