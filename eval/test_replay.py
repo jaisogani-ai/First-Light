@@ -1,31 +1,19 @@
-"""
-PCC Evaluation Suite: Replay Attack Test
-Verifies that re-sending an old, previously valid certificate fails sequence number freshness check.
-"""
+"""Resubmitting a previously-accepted (command, proof) pair must be rejected by the real,
+DB-backed sequence-freshness check — not an in-memory magic number."""
 
-import sys
-import os
-import unittest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../producer')))
-from certificate import FarkasCertificateGenerator
+def test_replayed_proof_rejected_after_first_acceptance(client, valid_command):
+    body = {
+        "command_row_id": valid_command["command_row_id"],
+        "proof": valid_command["proof"],
+        "submitted_command_id": valid_command["command_id"],
+        "submitted_u_cmd": valid_command["u_cmd"],
+        "mission_profile_key": "earth_observation",
+    }
 
-class TestReplayAttack(unittest.TestCase):
-    def setUp(self):
-        self.cert_gen = FarkasCertificateGenerator()
+    first = client.post("/api/commands/verify", json=body).json()
+    assert first["verdict"] == "VERIFIED"
 
-    def test_replayed_sequence_rejected(self):
-        x0 = [0.01, 0.01, 0.00]
-        u_cmd = [0.001, -0.002, 0.001]
-        
-        # Original command with sequence #1043
-        proof1, _ = self.cert_gen.generate_proof("RCS_PULSE_0042", x0, u_cmd, seq_no=1043)
-        last_accepted_seq = 1043
-
-        # Replay attack: resend proof1 (seq #1043) when verifier already accepted 1043
-        is_fresh = proof1["sequence_no"] > last_accepted_seq
-        self.assertFalse(is_fresh, "Replayed sequence number MUST be rejected at Step 1")
-        print("[TEST REPLAY ATTACK] Replayed sequence number correctly rejected (PASSED)")
-
-if __name__ == '__main__':
-    unittest.main()
+    replay = client.post("/api/commands/verify", json=body).json()
+    assert replay["verdict"] == "REJECTED"
+    assert replay["explain"]["failing_step"] == "Sequence Freshness"

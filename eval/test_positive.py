@@ -1,41 +1,29 @@
-"""
-PCC Evaluation Suite: Positive Verification Test
-Verifies that a valid RCS pulse command with a valid Farkas proof passes verification in < 3ms.
-"""
+"""A genuinely safe command is proposed and verified end-to-end against the live backend."""
 
-import sys
-import os
-import unittest
-import time
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../producer')))
-from certificate import FarkasCertificateGenerator
+def test_safe_maneuver_is_verified(client, valid_command):
+    assert valid_command["refused"] is False
+    assert valid_command["proof"]["certificate"]["multipliers"] != [0.20, 0.0, 0.40]  # not the old hardcoded value
 
-class TestPositiveVerification(unittest.TestCase):
-    def setUp(self):
-        self.cert_gen = FarkasCertificateGenerator()
+    body = {
+        "command_row_id": valid_command["command_row_id"],
+        "proof": valid_command["proof"],
+        "submitted_command_id": valid_command["command_id"],
+        "submitted_u_cmd": valid_command["u_cmd"],
+        "mission_profile_key": "earth_observation",
+    }
+    resp = client.post("/api/commands/verify", json=body)
+    assert resp.status_code == 200
+    data = resp.json()
 
-    def test_safe_maneuver_passes(self):
-        x0 = [0.01, 0.01, 0.00]
-        u_cmd = [0.001, -0.002, 0.001]
-        
-        t0 = time.perf_counter()
-        proof, cmd_bytes = self.cert_gen.generate_proof("RCS_PULSE_0042", x0, u_cmd, seq_no=1043)
-        t_gen = (time.perf_counter() - t0) * 1000
+    assert data["verdict"] == "VERIFIED"
+    assert data["trust"]["overall"] == "TRUSTED"
+    assert data["verifier_time_ms"] < 5.0, "verifier should be sub-5ms cheap arithmetic"
+    assert data["verifier_time_ms"] < valid_command["producer_time_ms"], "verifier must be faster than the solver"
 
-        self.assertIsNotNone(proof)
-        self.assertEqual(proof["command_id"], "RCS_PULSE_0042")
-        self.assertEqual(proof["sequence_no"], 1043)
-        
-        # Simulate cFS verifier arithmetic check time
-        t_v0 = time.perf_counter()
-        multipliers = proof["certificate"]["multipliers"]
-        sum_val = sum(m * 0.01 for m in multipliers) - 0.014
-        t_ver = (time.perf_counter() - t_v0) * 1000
 
-        self.assertLess(sum_val, 0.0, "Farkas contradiction must be strictly negative")
-        self.assertLess(t_ver, 3.0, "Verifier execution time must be under 3.0 ms")
-        print(f"[TEST POSITIVE] Producer Gen Time: {t_gen:.2f}ms | Verifier Check Time: {t_ver:.4f}ms (PASSED)")
-
-if __name__ == '__main__':
-    unittest.main()
+def test_different_inputs_produce_different_certificates(client):
+    a = client.post("/api/commands/propose", json={"maneuver_type": "SAFE_RCS_PULSE", "mission_profile_key": "earth_observation"}).json()
+    b = client.post("/api/commands/propose", json={"maneuver_type": "SAFE_RCS_PULSE", "mission_profile_key": "deep_space"}).json()
+    assert a["proof"]["bound"]["max_rad_s"] != b["proof"]["bound"]["max_rad_s"]
+    assert a["proof"]["certificate"]["constraints"] != b["proof"]["certificate"]["constraints"]

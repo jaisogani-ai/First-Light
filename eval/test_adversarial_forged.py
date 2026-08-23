@@ -1,35 +1,58 @@
+"""Hand-corrupted Farkas multipliers must be rejected by the real Farkas arithmetic check.
+
+The certificate's signature covers the whole payload, so external tampering with multipliers
+alone is actually caught at the Signature step first (defense in depth — see
+test_tampered_signature.py for that layer). To specifically exercise the Farkas layer, these
+tests re-sign the corrupted certificate with the same key (modeling a producer-side bug or a
+compromised signing key) so the request reaches the Farkas check intact.
 """
-PCC Evaluation Suite: Adversarial Forged Signature Test
-Verifies that forged or tampered signatures fail Step 3 verification.
-"""
 
-import sys
-import os
-import unittest
-import hmac
-import hashlib
+import copy
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../producer')))
-from certificate import FarkasCertificateGenerator
+from backend.security import compute_hmac_signature
 
-class TestAdversarialForged(unittest.TestCase):
-    def setUp(self):
-        self.cert_gen = FarkasCertificateGenerator()
 
-    def test_forged_signature_rejected(self):
-        x0 = [0.01, 0.01, 0.00]
-        u_cmd = [0.001, -0.002, 0.001]
-        proof, _ = self.cert_gen.generate_proof("RCS_PULSE_0042", x0, u_cmd, seq_no=1043)
+def _resign(proof: dict) -> dict:
+    proof = copy.deepcopy(proof)
+    without_sig = {k: v for k, v in proof.items() if k != "signature"}
+    proof["signature"] = compute_hmac_signature(without_sig)
+    return proof
 
-        # Attacker tampers with signature
-        proof["signature"] = "hmac_sha256:00000000000000000000000000000000"
 
-        # Verify signature check
-        expected_sig = "hmac_sha256:00000000000000000000000000000000"
-        is_valid = proof["signature"].startswith("hmac_sha256:") and proof["signature"] != expected_sig
-        
-        self.assertFalse(is_valid, "Verifier MUST reject forged signature")
-        print("[TEST ADVERSARIAL FORGED] Forged signature correctly caught and rejected (PASSED)")
+def test_negative_multiplier_rejected(client, valid_command):
+    proof = copy.deepcopy(valid_command["proof"])
+    proof["certificate"]["multipliers"][0] = -1.0  # violates lambda >= 0
+    proof = _resign(proof)
 
-if __name__ == '__main__':
-    unittest.main()
+    body = {
+        "command_row_id": valid_command["command_row_id"],
+        "proof": proof,
+        "submitted_command_id": valid_command["command_id"],
+        "submitted_u_cmd": valid_command["u_cmd"],
+        "mission_profile_key": "earth_observation",
+    }
+    resp = client.post("/api/commands/verify", json=body)
+    data = resp.json()
+
+    assert data["verdict"] == "REJECTED"
+    assert data["explain"]["failing_step"] == "Farkas Inequality"
+
+
+def test_arbitrary_multipliers_disconnected_from_state_rejected(client, valid_command):
+    proof = copy.deepcopy(valid_command["proof"])
+    proof["certificate"]["multipliers"] = [0.9] * len(proof["certificate"]["multipliers"])  # not derived from x_post
+    proof = _resign(proof)
+
+    body = {
+        "command_row_id": valid_command["command_row_id"],
+        "proof": proof,
+        "submitted_command_id": valid_command["command_id"],
+        "submitted_u_cmd": valid_command["u_cmd"],
+        "mission_profile_key": "earth_observation",
+    }
+    resp = client.post("/api/commands/verify", json=body)
+    data = resp.json()
+
+    # The old code (0.01/0.014 magic-constant formula) would have accepted whatever was here.
+    assert data["verdict"] == "REJECTED"
+    assert data["explain"]["failing_step"] == "Farkas Inequality"
