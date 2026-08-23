@@ -11,6 +11,15 @@ AI mission-planning agents are increasingly proposed for spacecraft autonomy, bu
 
 **Proof-Carrying Commands (PCC)** is the response: the ground-side AI agent does the expensive work (an SMT/Z3 solve deriving a mathematical certificate of safety) and attaches that certificate to the command. The spacecraft-side verifier does not re-solve anything — it recomputes a small, deterministic arithmetic check over the certificate's own stated numbers. This is the **locked research contribution** of this project: the mechanism, the Farkas-style certificate family, the angular-rate safety property, and the producer/verifier computational asymmetry are unchanged from the original design.
 
+### Related work
+
+This positions PCC relative to existing approaches rather than claiming an unoccupied space:
+
+- **Runtime Assurance (RTA) for spacecraft attitude maneuvering** — AFRL's STARS program work on simultaneous-constraint RTA for attitude control ([Black et al., arXiv:2402.14723](https://arxiv.org/pdf/2402.14723)) is the closest prior art: same domain (attitude control), same goal (bound an AI/optimization-based controller's output to a safe set), different mechanism — RTA wraps the controller with a real-time safety filter that can override its output, rather than requiring the controller to carry a machine-checkable proof of why its own output is already safe.
+- **Runtime verification meets LLMs** — "Watchdogs and Oracles" ([arXiv:2511.14435](https://arxiv.org/pdf/2511.14435)) frames the same "don't trust the AI, check it cheaply" problem this project addresses, for LLM-driven autonomous systems generally rather than a specific certificate family.
+- **AI verification for CubeSat autonomy** — "Glass Box at Orbit" ([arXiv:2606.02967](https://arxiv.org/pdf/2606.02967)) targets the same platform class (CubeSat-scale autonomy) with a constitutional-AI verification framework rather than a solver-derived certificate.
+- **A real, labeled attack dataset exists and isn't used here** — a reproducible open-source CubeSat testbed with labeled telemetry and cyberattack logs ([Reproducible and Open-Source Testbed for Satellite Cybersecurity, ACM REP '25](https://dl.acm.org/doi/10.1145/3736731.3746144)) is a concrete, named candidate for replacing this project's synthetic Attack Library scenarios with real recorded attack traffic — named here as an honest next step, not claimed as already integrated.
+
 ## 2. What Changed in This Build
 
 The original hackathon prototype demonstrated the *idea* with fabricated data: hardcoded Farkas multipliers, a verifier that checked string prefixes instead of cryptographic hashes/signatures, a magic sequence-number constant instead of persisted state, and a frontend that pushed `Math.random()` rows into a JS array. None of that is defensible under inspection — a hash check that isn't a hash check is not a security property.
@@ -162,6 +171,8 @@ cd docker && docker compose up --build
 - The Digital Twin is a deterministic simulation, not live spacecraft telemetry.
 - Rate limiting is in-memory and per-process — it does not survive a restart or scale across processes.
 - The C reference verifier's HMAC key is a compiled-in demo constant, explicitly not suitable for flight use (see the comment in `apps/gate/fsw/src/gate_verify.c`).
+- The Attack Library's seven scenarios are synthetically constructed mutations, not recorded real-world attack traffic — see §1's Related Work for a named, real dataset that could replace them.
+- The Mission Planner Agent's LLM call (`producer/llm_planner.py`) is unvalidated beyond "does it produce a parseable, safety-checked proposal" — there is no adversarial or distributional testing of what Claude actually proposes across a wide input range, only confirmation that the downstream deterministic pipeline safely handles whatever it returns.
 
 ## License
 
