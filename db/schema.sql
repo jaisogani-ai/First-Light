@@ -133,6 +133,21 @@ CREATE TABLE IF NOT EXISTS security_events (
     created_at                      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+-- Tamper-evident audit chain: each command's link hashes in the previous link's hash,
+-- its own command_hash, signature, and sequence_no (Merkle/blockchain-style hash chaining).
+-- Corrupting any past command_hash/signature breaks every chain_hash computed after it —
+-- see backend/audit_chain.py for the real recomputation-and-compare verification.
+CREATE TABLE IF NOT EXISTS audit_chain (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    command_id          INTEGER NOT NULL REFERENCES commands(id),
+    sequence_index       INTEGER NOT NULL,
+    previous_chain_hash    TEXT NOT NULL,
+    chain_hash              TEXT NOT NULL,
+    created_at                TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_commands_sequence ON commands(sequence_no);
 CREATE INDEX IF NOT EXISTS idx_pipeline_steps_run ON pipeline_steps(run_id, step_order);
 CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON telemetry(ts);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_chain_command ON audit_chain(command_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_chain_sequence ON audit_chain(sequence_index);

@@ -86,6 +86,14 @@ Every verification result carries structured explain data (`backend/schemas.py: 
 
 `backend/digital_twin.py` is a real, deterministic physics-based simulator: it reuses `SpacecraftDynamics` (the same rigid-body model the Proof Generator uses) to propagate attitude, and adds simple, honestly-labeled models for reaction-wheel momentum, thermal RC response, battery state-of-charge, and comm/sensor latency. It is **not live spacecraft telemetry** — it is a simulation, and is described as such everywhere it appears.
 
+### Tamper-Evident Audit Chain
+
+`backend/audit_chain.py` implements a real Merkle/blockchain-style hash chain over the `commands` table: each command's link hashes the previous link's hash together with its own `command_hash`, `signature`, and `sequence_no` (`GET /api/audit/chain`). Verification (`GET /api/audit/verify`) never trusts a stored `chain_hash` — it independently recomputes every link from the command's *current* row data and compares. A direct SQL edit to a historical `command_hash` (bypassing the API entirely) breaks every chain hash computed after it and is caught at the exact link where it happened — verified in `eval/test_audit_chain.py`, including a test that corrupts a row via raw SQL and confirms `broken_at_index` points at it.
+
+### Pipeline Dependency Graph
+
+`GET /api/pipeline/graph?run_id=` (`backend/pipeline_graph.py`) exposes the multi-agent pipeline as a real dependency graph rather than a fixed diagram: edges between agent steps are derived by checking whether a value in one step's real `outputs` actually reappears in the next step's real `inputs` (e.g. the Dynamics Agent's `x_post` output is the literal value the Safety Agent's `x_post` input receives) — an edge is labeled `"data"` when a field genuinely matches and `"control"` when the steps only share sequencing. A final `verifier` node documents which certificate fields (`command_hash`, `signature`, `multipliers`, `constraints`, `sequence_no`) the independent verifier actually reads. Verified in `eval/test_pipeline_and_attacks.py::test_pipeline_graph_reflects_real_data_flow`.
+
 ## 4. Real Farkas Certificate Construction
 
 The safety property is `post_maneuver_omega_bound`: after a maneuver, `|ω_i| ≤ ω_max` on every axis. This is encoded as six signed half-space constraints (`producer/rules.py: AngularRateRule`):

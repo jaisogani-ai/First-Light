@@ -119,3 +119,13 @@ audit_logs = Table(
     Column("detail_json", Text),
     Column("created_at", String),
 )
+
+audit_chain = Table(
+    "audit_chain", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("command_id", Integer, ForeignKey("commands.id")),
+    Column("sequence_index", Integer),
+    Column("previous_chain_hash", String),
+    Column("chain_hash", String),
+    Column("created_at", String),
+)

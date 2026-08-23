@@ -3,6 +3,7 @@ its certificate, its pipeline-step trace, and its verification result."""
 
 import json
 
+from backend.audit_chain import append_to_chain
 from backend.models import commands, pipeline_steps, proof_certificates, verification_results
 
 
@@ -30,6 +31,8 @@ def persist_command(conn, command_id: str, mission_profile_id: int, proof: dict,
         model_id=proof["model_id"],
         signature=proof["signature"],
     ))
+
+    append_to_chain(conn, row_id, proof["command_hash"], proof["signature"], sequence_no)
     return row_id
 
 

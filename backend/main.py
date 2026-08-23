@@ -8,7 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from backend.db import init_db
-from backend.routers import attacks, commands, evaluation, metrics, pipeline, profiles, replay, telemetry
+from backend.routers import attacks, audit, commands, evaluation, metrics, pipeline, profiles, replay, telemetry
 from backend.ws_manager import ws_manager
 from db.seed import seed as seed_profiles
 
@@ -35,6 +35,7 @@ app.include_router(attacks.router)
 app.include_router(telemetry.router)
 app.include_router(evaluation.router)
 app.include_router(metrics.router)
+app.include_router(audit.router)
 
 
 @app.websocket("/ws")
