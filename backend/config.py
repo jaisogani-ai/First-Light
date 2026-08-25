@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     hmac_secret_key: str = Field(default_factory=_resolve_default_secret_key)
     rate_limit_per_minute: int = 60
     default_mission_profile: str = "earth_observation"
+    mission_documents_dir: str = "./data/mission_documents"
 
 
 settings = Settings()

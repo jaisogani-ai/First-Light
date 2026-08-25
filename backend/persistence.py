@@ -8,9 +8,10 @@ from backend.models import commands, pipeline_steps, proof_certificates, verific
 
 
 def persist_command(conn, command_id: str, mission_profile_id: int, proof: dict, u_cmd, sequence_no: int,
-                     producer_time_ms: float) -> int:
+                     producer_time_ms: float, mission_id: int | None = None) -> int:
     result = conn.execute(commands.insert().values(
         command_id=command_id,
+        mission_id=mission_id,
         mission_profile_id=mission_profile_id,
         command_hash=proof["command_hash"],
         sequence_no=sequence_no,

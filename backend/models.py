@@ -18,10 +18,69 @@ mission_profiles = Table(
     Column("created_at", String),
 )
 
+missions = Table(
+    "missions", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_name", String),
+    Column("objective", Text),
+    Column("mission_profile_id", Integer, ForeignKey("mission_profiles.id")),
+    Column("tle_line1", Text),
+    Column("tle_line2", Text),
+    Column("status", String),
+    Column("active", Integer),
+    Column("created_at", String),
+)
+
+spacecraft = Table(
+    "spacecraft", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("name", String),
+    Column("inertia_ixx", Float),
+    Column("inertia_iyy", Float),
+    Column("inertia_izz", Float),
+)
+
+spacecraft_components = Table(
+    "spacecraft_components", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("spacecraft_id", Integer, ForeignKey("spacecraft.id")),
+    Column("component_type", String),
+    Column("name", String),
+    Column("parameters_json", Text),
+    Column("created_at", String),
+)
+
+mission_imports = Table(
+    "mission_imports", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("import_type", String),
+    Column("filename", String),
+    Column("record_count", Integer),
+    Column("detail_json", Text),
+    Column("checksum", String),
+    Column("source", String),
+    Column("schema_version", String),
+    Column("freshness_days", Float),
+    Column("imported_at", String),
+)
+
+mission_reports = Table(
+    "mission_reports", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("report_type", String),
+    Column("generated_by", String),
+    Column("content_json", Text),
+    Column("created_at", String),
+)
+
 commands = Table(
     "commands", metadata,
     Column("id", Integer, primary_key=True),
     Column("command_id", String, unique=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
     Column("mission_profile_id", Integer, ForeignKey("mission_profiles.id")),
     Column("command_hash", String),
     Column("sequence_no", Integer),
@@ -90,6 +149,7 @@ sequence_state = Table(
 telemetry = Table(
     "telemetry", metadata,
     Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
     Column("spacecraft_id", Integer),
     Column("ts", String),
     Column("omega_x", Float),
@@ -119,6 +179,48 @@ audit_logs = Table(
     Column("command_id", Integer, ForeignKey("commands.id")),
     Column("action", String),
     Column("detail_json", Text),
+    Column("created_at", String),
+)
+
+mission_documents = Table(
+    "mission_documents", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("doc_type", String),
+    Column("filename", String),
+    Column("version_no", Integer),
+    Column("content_type", String),
+    Column("size_bytes", Integer),
+    Column("checksum", String),
+    Column("storage_path", String),
+    Column("extraction_status", String),
+    Column("extracted_text", Text),
+    Column("extracted_metadata_json", Text),
+    Column("uploaded_at", String),
+)
+
+document_sections = Table(
+    "document_sections", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("document_id", Integer, ForeignKey("mission_documents.id")),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("section_type", String),
+    Column("page_number", Integer),
+    Column("content_text", Text),
+    Column("order_index", Integer),
+    Column("created_at", String),
+)
+
+agent_runs = Table(
+    "agent_runs", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("mission_id", Integer, ForeignKey("missions.id")),
+    Column("agent_name", String),
+    Column("status", String),
+    Column("input_summary", Text),
+    Column("output_json", Text),
+    Column("error_message", Text),
+    Column("latency_ms", Float),
     Column("created_at", String),
 )
 

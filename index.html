@@ -1,122 +1,631 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NASA cFS — Proof-Carrying Commands (PCC) Flight Safety System</title>
+    <title>FIRST LIGHT — Proof-Carrying Commands Mission Control</title>
+    <meta name="description" content="FIRST LIGHT aerospace mission control platform — real-time spacecraft verification, Farkas certificate generation, and multi-agent AI pipeline.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="dark-theme">
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="logo-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="9" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="3 3"/>
-                        <path d="M12 3L15 9L21 12L15 15L12 21L9 15L3 12L9 9L12 3Z" fill="#38BDF8"/>
-                    </svg>
+<body class="antialiased min-h-screen flex flex-col md:flex-row font-body-sm bg-background selection:bg-primary-container selection:text-on-primary-container">
+
+<div class="app-container">
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SIDEBAR NAVIGATION
+    ════════════════════════════════════════════════════════════════ -->
+    <aside class="sidebar">
+
+        <!-- Header / Brand -->
+        <div class="brand">
+            <div class="brand-wordmark">FIRST LIGHT</div>
+            <span class="brand-mission">OP-ALPHA-01 · PCC Gate v1.1</span>
+        </div>
+
+        <!-- Launch Protocol CTA -->
+        <div class="sidebar-cta">
+            <button class="btn-launch">
+                <span class="material-symbols-outlined">rocket_launch</span>
+                LAUNCH PROTOCOL
+            </button>
+        </div>
+
+        <!-- Main Navigation Links — app.js binds .nav-item[data-screen] -->
+        <nav class="nav-menu">
+            <button class="nav-item active" data-screen="overview">
+                <span class="material-symbols-outlined nav-icon">dashboard</span>
+                <span>Mission Overview</span>
+            </button>
+            <button class="nav-item" data-screen="planning">
+                <span class="material-symbols-outlined nav-icon">route</span>
+                <span>Mission Planning</span>
+            </button>
+            <button class="nav-item" data-screen="files">
+                <span class="material-symbols-outlined nav-icon">description</span>
+                <span>Mission Files</span>
+            </button>
+            <button class="nav-item" data-screen="spacecraft">
+                <span class="material-symbols-outlined nav-icon">satellite_alt</span>
+                <span>Spacecraft Config</span>
+            </button>
+            <button class="nav-item" data-screen="telemetry">
+                <span class="material-symbols-outlined nav-icon">monitoring</span>
+                <span>Telemetry</span>
+            </button>
+
+            <div class="nav-divider"></div>
+
+            <button class="nav-item" data-screen="twin">
+                <span class="material-symbols-outlined nav-icon">view_in_ar</span>
+                <span>Digital Twin</span>
+            </button>
+            <button class="nav-item" data-screen="pipeline">
+                <span class="material-symbols-outlined nav-icon">hub</span>
+                <span>Multi-Agent Pipeline</span>
+            </button>
+            <button class="nav-item" data-screen="verification">
+                <span class="material-symbols-outlined nav-icon">verified_user</span>
+                <span>Verification</span>
+            </button>
+            <button class="nav-item" data-screen="replay">
+                <span class="material-symbols-outlined nav-icon">history</span>
+                <span>Replay</span>
+            </button>
+
+            <div class="nav-divider"></div>
+
+            <button class="nav-item" data-screen="knowledge">
+                <span class="material-symbols-outlined nav-icon">menu_book</span>
+                <span>Knowledge</span>
+            </button>
+            <button class="nav-item" data-screen="reports">
+                <span class="material-symbols-outlined nav-icon">monitor_heart</span>
+                <span>Reports</span>
+            </button>
+            <button class="nav-item" data-screen="evidence">
+                <span class="material-symbols-outlined nav-icon">fact_check</span>
+                <span>Evidence</span>
+            </button>
+
+            <div class="nav-divider"></div>
+
+            <button class="nav-item" data-screen="settings">
+                <span class="material-symbols-outlined nav-icon">settings</span>
+                <span>Settings</span>
+            </button>
+        </nav>
+
+        <!-- WebSocket Status Indicator -->
+        <div class="sidebar-status">
+            <div class="status-indicator online pulse" id="ws-status-indicator"></div>
+            <div class="status-details">
+                <span class="label">Backend WebSocket</span>
+                <span class="value" id="ws-status-value">CONNECTING</span>
+            </div>
+        </div>
+
+        <!-- User Profile Minimal -->
+        <div class="sidebar-user">
+            <div class="sidebar-avatar">CMD</div>
+            <div class="sidebar-user-info">
+                <span class="sidebar-user-id">CMD-884</span>
+                <span class="sidebar-user-status">
+                    <span class="sidebar-user-status-dot"></span>
+                    ONLINE
+                </span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MAIN CONTENT AREA
+    ════════════════════════════════════════════════════════════════ -->
+    <main class="main-content">
+
+        <!-- Top Header Bar -->
+        <header class="top-header">
+            <div class="header-title">
+                <h1 id="screen-title">Mission Overview</h1>
+                <p class="header-sub" id="screen-subtitle">Pre-Execution Proof-Carrying Authorization for Spacecraft AI Autonomy</p>
+            </div>
+            <div class="action-bar">
+                <select id="mission-select" class="btn btn-secondary" style="cursor:pointer;min-width:160px"></select>
+                <button class="btn btn-secondary" id="btn-new-mission">
+                    <span class="material-symbols-outlined" style="font-size:14px">add</span>
+                    Mission
+                </button>
+                <select id="mission-profile-select" class="btn btn-secondary" style="cursor:pointer;min-width:150px"></select>
+                <button class="btn btn-go" id="btn-system-go">
+                    <span class="status-dot-go"></span>
+                    SYSTEM GO
+                </button>
+            </div>
+        </header>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 1: MISSION OVERVIEW
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-overview" class="screen-view active">
+
+            <!-- Top Row: Large MET Clock & Multi-Agent Command Graph -->
+            <div class="orbit-grid grid-overview-top">
+
+                <!-- MET Clock Card -->
+                <div class="panel panel-met">
+                    <div class="grid-bg-overlay"></div>
+                    <span class="panel-tag">Mission Elapsed Time</span>
+                    <div class="met-digits" id="met-clock-display">042:12:08:28</div>
+                    <div class="met-pills">
+                        <span>T-MINUS: <strong>00:00:00</strong></span>
+                        <span class="pip-sep">|</span>
+                        <span>PHASE: <strong class="text-cyan">CRUISE</strong></span>
+                    </div>
                 </div>
-                <div class="brand-text">
-                    <span class="title">PCC FLIGHT GATE</span>
-                    <span class="subtitle">NASA cFS Substrate v1.1</span>
+
+                <!-- Multi-Agent Command Graph Preview Card -->
+                <div class="panel panel-graph-preview">
+                    <div class="panel-header">
+                        <h2>Multi-Agent Command Graph</h2>
+                        <span class="badge badge-success">LIVE EXECUTION</span>
+                    </div>
+                    <div class="graph-nodes-row">
+                        <div class="graph-node-item active">
+                            <div class="graph-node-icon"><span class="material-symbols-outlined">psychology</span></div>
+                            <span class="graph-node-name">PLANNER</span>
+                        </div>
+                        <div class="graph-node-line"></div>
+                        <div class="graph-node-item">
+                            <div class="graph-node-icon"><span class="material-symbols-outlined">route</span></div>
+                            <span class="graph-node-name">DYNAMICS</span>
+                        </div>
+                        <div class="graph-node-line"></div>
+                        <div class="graph-node-item">
+                            <div class="graph-node-icon"><span class="material-symbols-outlined">shield</span></div>
+                            <span class="graph-node-name">SAFETY</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Middle Row: Telemetry Cards & Agent Reasoning Feed -->
+            <div class="orbit-grid grid-overview-mid">
+
+                <!-- High-Density Telemetry Cards -->
+                <div class="telemetry-bento-trio">
+                    <div class="panel card-telemetry-stat">
+                        <span class="stat-label">Velocity (Inertial)</span>
+                        <div class="metric-value">27,580<span class="metric-unit">km/h</span></div>
+                        <div class="metric-range-bar">
+                            <div class="range-labels"><span>27,100</span><span>28,000</span></div>
+                            <div class="bar-track"><div class="bar-fill cyan" style="width:85%"></div></div>
+                            <span class="metric-delta text-cyan">+12.4 m/s²</span>
+                        </div>
+                    </div>
+
+                    <div class="panel card-telemetry-stat">
+                        <span class="stat-label">Orbital Altitude</span>
+                        <div class="metric-value">408.5<span class="metric-unit">km</span></div>
+                        <div class="metric-range-bar">
+                            <div class="range-labels"><span>390.0</span><span>420.0</span></div>
+                            <div class="bar-track"><div class="bar-fill blue" style="width:45%"></div></div>
+                            <span class="metric-delta text-blue">-0.2 km/h</span>
+                        </div>
+                    </div>
+
+                    <div class="panel card-telemetry-stat">
+                        <span class="stat-label">Main Bus Power</span>
+                        <div class="metric-value text-amber">114.2<span class="metric-unit">V</span></div>
+                        <div class="metric-range-bar">
+                            <div class="range-labels"><span>110.0</span><span>120.0</span></div>
+                            <div class="bar-track"><div class="bar-fill amber" style="width:92%"></div></div>
+                            <span class="metric-delta text-amber">-1.8 V/h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Reasoning Feed -->
+                <div class="panel card-agent-reasoning">
+                    <div class="panel-header">
+                        <h2 class="text-cyan"><span class="material-symbols-outlined">memory</span> Agent Reasoning</h2>
+                        <span class="badge badge-info">LATENCY: 12ms</span>
+                    </div>
+                    <div class="agent-reasoning-stream">
+                        <div class="reasoning-entry">
+                            <div class="entry-header">
+                                <span class="agent-name-tag">DYNAMICS_AGENT</span>
+                                <span class="entry-time">T-00:05:12</span>
+                            </div>
+                            <p class="entry-text">Detected slight variance in Bus Power voltage. Correlating with thermal radiator angle.</p>
+                        </div>
+                        <div class="reasoning-entry active">
+                            <div class="entry-header">
+                                <span class="agent-name-tag cyan">PLANNER_AGENT</span>
+                                <span class="entry-time text-cyan">T-00:01:03</span>
+                            </div>
+                            <p class="entry-text">Hypothesis: Radiator shadowing causing localized cool-down. Recommend minimal attitude adjustment.</p>
+                            <div class="reasoning-actions">
+                                <button class="btn btn-secondary btn-sm" id="btn-review-logic">Review Logic</button>
+                                <button class="btn btn-primary btn-sm" id="btn-approve-adjust">Approve Adjust</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Mission Status Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Mission Status</h2>
+                    <span class="badge" id="ov-health-badge">—</span>
+                </div>
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <span class="stat-label">Mission</span>
+                        <span class="stat-value" id="ov-mission-name" style="font-size:1rem">—</span>
+                        <span class="stat-meta" id="ov-mission-status">—</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Verification State</span>
+                        <span class="stat-value" id="ov-verification" style="font-size:1rem">—</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Telemetry Freshness</span>
+                        <span class="stat-value" id="ov-freshness" style="font-size:1rem">—</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Commands Verified / Rejected</span>
+                        <span class="stat-value">
+                            <span id="ov-pass-count">0</span>
+                            <span style="color:var(--text-muted);margin:0 0.2rem;font-size:1rem">/</span>
+                            <span id="ov-drop-count" class="text-red">0</span>
+                        </span>
+                    </div>
+                </div>
+                <ul class="trust-checklist" id="ov-health-reasons"></ul>
+            </div>
+
+            <!-- Bottom Row: Recent Activity & Operator Workflow -->
+            <div class="orbit-grid">
+                <div class="panel feed-panel">
+                    <div class="panel-header">
+                        <h2>Recent Activity</h2>
+                        <span class="badge badge-info">Execution history</span>
+                    </div>
+                    <div id="ov-activity-list"><p class="card-desc">Loading…</p></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Operator Workflow</h2>
+                    </div>
+                    <ol class="workflow-steps">
+                        <li><strong>Mission Files / Spacecraft Configuration</strong> — upload a TLE, spacecraft profile, telemetry, or research documents for this mission.</li>
+                        <li><strong>Mission Planning</strong> — propose a maneuver; it runs through the real Planner → Dynamics → Safety → Proof Generator → Reviewer pipeline.</li>
+                        <li><strong>Verification</strong> — inspect the Farkas certificate, constraint matrix, solver output, and cryptographic hashes.</li>
+                        <li><strong>Replay / Evidence</strong> — step back through mission history and export a full evidence package.</li>
+                        <li><strong>Knowledge</strong> — ask grounded questions about uploaded documents, or run a Paper/Algorithm Review.</li>
+                    </ol>
                 </div>
             </div>
 
-            <nav class="nav-menu">
-                <button class="nav-item active" data-screen="orbit">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                    <span>Flight Digital Twin</span>
-                </button>
-                <button class="nav-item" data-screen="sandbox">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-                    <span>Maneuver Planner</span>
-                </button>
-                <button class="nav-item" data-screen="observatory">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                    <span>AI Agent Observatory</span>
-                </button>
-                <button class="nav-item" data-screen="timeline">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Command Telemetry</span>
-                </button>
-                <button class="nav-item" data-screen="security">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span>Attack Library</span>
-                </button>
-                <button class="nav-item" data-screen="replay">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9M3 12l4-4M3 12l4 4"/></svg>
-                    <span>Mission Replay</span>
-                </button>
-            </nav>
-
-            <div class="sidebar-status">
-                <div class="status-indicator online pulse" id="ws-status-indicator"></div>
-                <div class="status-details">
-                    <span class="label">Backend WebSocket</span>
-                    <span class="value" id="ws-status-value">CONNECTING</span>
+            <!-- Bottom Timeline Scrubber Card -->
+            <div class="panel panel-timeline-scrubber">
+                <div class="panel-header">
+                    <h2>Mission Timeline</h2>
+                    <div class="scrubber-btns">
+                        <button class="btn-icon-sm"><span class="material-symbols-outlined">fast_rewind</span></button>
+                        <button class="btn-icon-sm text-cyan"><span class="material-symbols-outlined">play_arrow</span></button>
+                        <button class="btn-icon-sm"><span class="material-symbols-outlined">fast_forward</span></button>
+                    </div>
+                </div>
+                <div class="scrubber-track-wrap">
+                    <input type="range" min="0" max="100" value="50" class="timeline-range-input">
+                    <div class="scrubber-labels">
+                        <span>T-12:00:00</span>
+                        <span class="text-cyan font-semibold">NOW (42:12:08)</span>
+                        <span>T+12:00:00</span>
+                    </div>
                 </div>
             </div>
-        </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Header -->
-            <header class="top-header">
-                <div class="header-title">
-                    <h1 id="screen-title">Spacecraft Orbital & Attitude Dynamics</h1>
-                    <p class="header-sub">Pre-Execution Proof-Carrying Authorization for Spacecraft AI Autonomy</p>
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 2: MISSION PLANNING
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-planning" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Propose a Maneuver</h2>
+                    <span class="badge badge-info">Real Planner → Dynamics → Safety → Proof Generator → Reviewer → Verifier pipeline</span>
                 </div>
-                <div class="action-bar">
-                    <select id="mission-profile-select" class="btn btn-secondary"></select>
+                <div class="ops-btn-row">
                     <button class="btn btn-secondary" id="btn-trigger-safe">
-                        <span class="btn-icon">▶</span> Propose Safe RCS Maneuver
+                        <span class="btn-icon">▶</span>
+                        Propose Safe RCS Maneuver
                     </button>
                     <button class="btn btn-warning" id="btn-trigger-unsafe">
-                        <span class="btn-icon">⚠</span> Propose Unsafe AI Maneuver
-                    </button>
-                    <button class="btn btn-danger" id="btn-trigger-attack">
-                        <span class="btn-icon">⚡</span> Run Replay Attack
+                        <span class="btn-icon">⚠</span>
+                        Propose Unsafe AI Maneuver
                     </button>
                 </div>
-            </header>
+            </div>
 
-            <!-- Screen 1: 3D Orbital & Attitude Visualizer -->
-            <section id="screen-orbit" class="screen-view active">
-                <div class="orbit-grid">
-                    <!-- Left: Interactive Canvas Satellite Simulation -->
-                    <div class="panel canvas-panel">
-                        <div class="panel-header">
-                            <h2>Spacecraft Attitude & Orbital Visualizer</h2>
-                            <span class="badge badge-cyan" id="sat-state-badge">STABLE LEO ORBIT</span>
-                        </div>
-                        <div class="canvas-container">
-                            <canvas id="sat-canvas" width="600" height="380"></canvas>
-                            <div class="canvas-overlay">
-                                <div class="telemetry-pill">
-                                    <span class="pill-label">Angular Velocity ||ω||:</span>
-                                    <span class="pill-val" id="disp-omega">— rad/s</span>
-                                </div>
-                                <div class="telemetry-pill">
-                                    <span class="pill-label">Max Allowed Bound:</span>
-                                    <span class="pill-val amber" id="disp-bound">— rad/s</span>
-                                </div>
+            <div class="sandbox-grid">
+                <!-- Parameter Controls -->
+                <div class="panel controls-panel">
+                    <div class="panel-header">
+                        <h2>Interactive Maneuver Sandbox</h2>
+                        <span class="badge badge-cyan">Parameter Controls</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Initial Angular Velocity ω_x (rad/s): <span id="val-wx">0.010</span></label>
+                        <input type="range" id="slider-wx" min="-0.05" max="0.05" step="0.005" value="0.010">
+                    </div>
+                    <div class="slider-group">
+                        <label>Initial Angular Velocity ω_y (rad/s): <span id="val-wy">0.010</span></label>
+                        <input type="range" id="slider-wy" min="-0.05" max="0.05" step="0.005" value="0.010">
+                    </div>
+                    <div class="slider-group">
+                        <label>Proposed RCS Thrust Torque u_x (Nm): <span id="val-ux">0.001</span></label>
+                        <input type="range" id="slider-ux" min="-0.05" max="0.05" step="0.001" value="0.001">
+                    </div>
+                    <div class="slider-group">
+                        <label>Proposed RCS Thrust Torque u_y (Nm): <span id="val-uy">-0.002</span></label>
+                        <input type="range" id="slider-uy" min="-0.05" max="0.05" step="0.001" value="-0.002">
+                    </div>
+                    <button class="btn btn-primary full-width" id="btn-calc-proof">
+                        Evaluate Z3 Proof &amp; Test NASA cFS Verifier
+                    </button>
+                </div>
+
+                <!-- Farkas Certificate Payload -->
+                <div class="panel proof-output-panel">
+                    <div class="panel-header">
+                        <h2>Live Generated Farkas Certificate Payload</h2>
+                        <span class="badge badge-purple">Schema v1.1</span>
+                    </div>
+                    <pre class="json-code" id="sandbox-json-display">Propose a maneuver to see the real Z3-derived certificate payload.</pre>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 3: MISSION FILES
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-files" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Upload Mission File</h2>
+                    <span class="badge badge-info">Real text extraction — PDF, DOCX, notebook, MATLAB, Markdown, LaTeX, plain text</span>
+                </div>
+                <div class="ops-import-card">
+                    <select id="doc-upload-type" class="ops-input" style="flex:none;width:auto">
+                        <option value="RESEARCH_PAPER">Research Paper</option>
+                        <option value="ENGINEERING_PDF">Engineering PDF</option>
+                        <option value="ALGORITHM_DESCRIPTION">Algorithm Description</option>
+                        <option value="NOTEBOOK">Notebook (.ipynb)</option>
+                        <option value="MATLAB_SCRIPT">MATLAB Script (.m)</option>
+                        <option value="CONFIGURATION_FILE">Configuration File</option>
+                        <option value="FLIGHT_RULES">Flight Rules</option>
+                        <option value="SAFETY_DOCUMENT">Safety Document</option>
+                        <option value="IMAGE">Image</option>
+                        <option value="ENGINEERING_NOTES">Engineering Notes</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                    <input type="file" id="doc-upload-file" class="ops-input" style="flex:1">
+                    <button class="btn btn-primary" id="btn-upload-document">Upload</button>
+                </div>
+                <p class="ops-note">Structured operational data (TLE, OMM, CSV telemetry, spacecraft/constraint profiles) uses dedicated Import forms on Spacecraft Config and Telemetry pages.</p>
+            </div>
+
+            <!-- Mission Intake Agent -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Mission Intake Agent</h3>
+                    <span class="badge badge-info">Deterministic — checksum/format/missing-field checks</span>
+                </div>
+                <div id="intake-findings" class="card-desc">Upload a document to run intake analysis, or an intake summary will appear here after your next upload.</div>
+            </div>
+
+            <!-- Uploaded Files -->
+            <div class="panel">
+                <div class="panel-header"><h3>Uploaded Files</h3></div>
+                <div class="table-container">
+                    <table class="cmd-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Filename</th>
+                                <th>Ver</th>
+                                <th>Size</th>
+                                <th>Extraction</th>
+                                <th>Review</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doc-list-body">
+                            <tr><td colspan="6" class="card-desc">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 4: SPACECRAFT CONFIGURATION
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-spacecraft" class="screen-view">
+
+            <div class="orbit-grid">
+                <div class="panel ops-panel">
+                    <div class="panel-header">
+                        <h2>Spacecraft Configuration Engine</h2>
+                        <span class="badge badge-info">Deterministic — no LLM</span>
+                    </div>
+                    <textarea id="spacecraft-config-json" class="ops-input ops-textarea" style="min-height:130px" placeholder='{"name":"CubeSat-1","inertia_ixx":0.02,"inertia_iyy":0.02,"inertia_izz":0.01,"components":[{"component_type":"BATTERY","name":"B1","parameters":{"capacity_wh":150,"nominal_voltage_v":7.4}}]}'></textarea>
+                    <div class="ops-btn-row">
+                        <button class="btn btn-secondary" id="btn-configure-dry">Validate</button>
+                        <button class="btn btn-primary" id="btn-configure-spacecraft">Configure</button>
+                    </div>
+                    <pre class="json-code" id="spacecraft-config-result">Submit a spacecraft configuration above. Component types: REACTION_WHEEL, THRUSTER, BATTERY, SOLAR_ARRAY, PAYLOAD, THERMAL_SYSTEM, COMM_SYSTEM, SENSOR, ATTITUDE_CONTROL, FUEL_TANK.</pre>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Structured Spacecraft Model</h2>
+                        <span class="badge badge-info">Persisted — real DB state</span>
+                    </div>
+                    <div id="spacecraft-model-view"><p class="card-desc">Loading…</p></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Import: Structured Spacecraft Profile</h3>
+                    <span class="badge badge-info">Inertia-only, quick path</span>
+                </div>
+                <textarea id="import-spacecraft" class="ops-input ops-textarea" placeholder='{"name":"CubeSat-1","inertia_ixx":0.02,"inertia_iyy":0.02,"inertia_izz":0.01}'></textarea>
+                <div class="ops-btn-row">
+                    <button class="btn btn-secondary" data-import="spacecraft-profile" data-dry="true">Validate</button>
+                    <button class="btn btn-primary" data-import="spacecraft-profile" data-dry="false">Import</button>
+                </div>
+                <pre class="json-code" id="import-spacecraft-profile-result" style="max-height:140px">Select an option above.</pre>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 5: TELEMETRY
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-telemetry" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Latest Telemetry</h2>
+                    <span class="badge badge-info">Real Digital Twin ticks + imported CSV rows</span>
+                </div>
+                <!-- Sparklines -->
+                <div class="orbit-grid" style="margin-bottom:0">
+                    <div class="sparkline-wrap">
+                        <span class="sparkline-label">
+                            <span>Battery SOC — last 20 real rows</span>
+                            <span id="tel-spark-battery-latest">—</span>
+                        </span>
+                        <canvas id="tel-spark-battery"></canvas>
+                    </div>
+                    <div class="sparkline-wrap">
+                        <span class="sparkline-label">
+                            <span>Thermal — last 20 real rows</span>
+                            <span id="tel-spark-thermal-latest">—</span>
+                        </span>
+                        <canvas id="tel-spark-thermal"></canvas>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="cmd-table">
+                        <thead>
+                            <tr>
+                                <th>TS</th>
+                                <th>ωx</th><th>ωy</th><th>ωz</th>
+                                <th>RW Momentum</th>
+                                <th>Battery %</th>
+                                <th>Temp °C</th>
+                                <th>Power W</th>
+                            </tr>
+                        </thead>
+                        <tbody id="telemetry-latest-body">
+                            <tr><td colspan="8"><span class="skeleton-line w60"></span><span class="skeleton-line w80"></span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="orbit-grid">
+                <div class="panel">
+                    <div class="panel-header"><h3>Import CSV Telemetry</h3></div>
+                    <input type="file" id="import-csv-file" accept=".csv" class="ops-input">
+                    <div class="ops-btn-row">
+                        <button class="btn btn-secondary" data-import="csv" data-dry="true">Validate</button>
+                        <button class="btn btn-primary" data-import="csv" data-dry="false">Import</button>
+                    </div>
+                    <pre class="json-code" id="import-result">Select a CSV file above.</pre>
+                </div>
+                <div class="panel ops-panel">
+                    <div class="panel-header">
+                        <h2>Telemetry Analysis Engine</h2>
+                        <span class="badge badge-info">Deterministic numpy statistics — no LLM</span>
+                    </div>
+                    <button class="btn btn-primary" id="btn-run-telemetry-analysis">Run Analysis</button>
+                    <pre class="json-code" id="telemetry-analysis-result">Run analysis to see real sampling rate, gaps, sensor statistics, and trends for this mission's telemetry.</pre>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 6: DIGITAL TWIN (PRO AEROSPACE DESIGN)
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-twin" class="screen-view">
+
+            <!-- Top Orbit/Attitude Bar -->
+            <div class="twin-nav-bar">
+                <div class="twin-nav-left">
+                    <span class="twin-phase-tag">PHASE: ORBIT INSERTION</span>
+                    <span class="badge badge-cyan" id="sat-state-badge">STABLE LEO ORBIT</span>
+                </div>
+                <div class="twin-nav-center font-mono">
+                    <span>ALT: <strong>422.51 km</strong></span>
+                    <span>VEL: <strong>7.662 km/s</strong></span>
+                    <span>POS: <strong>12.5°N / 44.1°E</strong></span>
+                </div>
+                <div class="twin-nav-right">
+                    <button class="btn btn-secondary btn-sm">GO/NO-GO STATUS</button>
+                </div>
+            </div>
+
+            <!-- Main 3D Canvas Workspace with Floating Reticle & Bottom Overlays -->
+            <div class="twin-main-viewport">
+                <!-- Target Reticle Overlay -->
+                <div class="twin-reticle-overlay">
+                    <div class="reticle-header">
+                        <span>MODE</span>
+                        <span class="text-emerald font-bold">TRACKING</span>
+                    </div>
+                    <div class="reticle-body font-mono">TGT: NADIR</div>
+                </div>
+
+                <!-- Dual Canvases Grid (Sat Orbit + Farkas Barrier) -->
+                <div class="twin-canvases-grid">
+                    <div class="canvas-box-sat">
+                        <canvas id="sat-canvas" width="680" height="380"></canvas>
+                        <div class="canvas-overlay-pills">
+                            <div class="telemetry-pill">
+                                <span class="pill-label">Angular Velocity ||ω||:</span>
+                                <span class="pill-val" id="disp-omega">— rad/s</span>
+                            </div>
+                            <div class="telemetry-pill">
+                                <span class="pill-label">Max Allowed Bound:</span>
+                                <span class="pill-val amber" id="disp-bound">— rad/s</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Right: Farkas Barrier Certificate Math Chart -->
-                    <div class="panel chart-panel">
+                    <div class="canvas-box-farkas">
                         <div class="panel-header">
                             <h2>Farkas Infeasibility Barrier Plot</h2>
-                            <span class="badge badge-primary">Farkas Lemma Certificate</span>
+                            <span class="badge badge-purple">Farkas Certificate</span>
                         </div>
-                        <div class="canvas-container">
-                            <canvas id="farkas-canvas" width="480" height="280"></canvas>
-                        </div>
+                        <canvas id="farkas-canvas" width="480" height="260"></canvas>
                         <div class="farkas-math-box">
                             <span class="math-title">Farkas Contradiction Condition:</span>
                             <code class="math-expr" id="farkas-expr">Propose a maneuver to compute a live Farkas certificate.</code>
@@ -124,144 +633,965 @@
                     </div>
                 </div>
 
-                <!-- Stats Bar -->
+                <!-- Bottom Panel: Attitude Dynamics -->
+                <div class="panel twin-attitude-panel">
+                    <div class="panel-header">
+                        <h2>ATTITUDE DYNAMICS</h2>
+                        <span class="badge badge-success">NOMINAL</span>
+                    </div>
+                    <div class="attitude-bento-grid">
+                        <div class="att-col">
+                            <span class="att-label">ATTITUDE (QUAT)</span>
+                            <div class="att-values font-mono">
+                                <div><span>q1</span> <strong class="text-cyan">0.7071</strong></div>
+                                <div><span>q2</span> <strong>0.0002</strong></div>
+                                <div><span>q3</span> <strong>-0.0015</strong></div>
+                                <div><span>q4</span> <strong class="text-cyan">0.7071</strong></div>
+                            </div>
+                        </div>
+                        <div class="att-col border-l">
+                            <span class="att-label">ANGULAR VEL (deg/s)</span>
+                            <div class="att-values font-mono">
+                                <div><span>ωx</span> <strong>+0.002</strong></div>
+                                <div><span>ωy</span> <strong>-0.001</strong></div>
+                                <div><span>ωz</span> <strong>+0.054</strong></div>
+                            </div>
+                        </div>
+                        <div class="att-col border-l">
+                            <span class="att-label">RW MOMENTUM (N-m-s)</span>
+                            <div class="rw-bars font-mono">
+                                <div class="rw-item">
+                                    <span>RW1</span>
+                                    <span>1.24</span>
+                                    <div class="rw-track"><div class="rw-fill" style="width:40%"></div></div>
+                                </div>
+                                <div class="rw-item">
+                                    <span>RW2</span>
+                                    <span>0.88</span>
+                                    <div class="rw-track"><div class="rw-fill" style="width:30%"></div></div>
+                                </div>
+                                <div class="rw-item">
+                                    <span>RW3</span>
+                                    <span>-2.10</span>
+                                    <div class="rw-track"><div class="rw-fill amber" style="width:70%"></div></div>
+                                </div>
+                                <div class="rw-item">
+                                    <span>RW4</span>
+                                    <span>0.05</span>
+                                    <div class="rw-track"><div class="rw-fill" style="width:5%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="att-col border-l flex-center">
+                            <span class="att-label">CONSTRAINT ENVELOPE</span>
+                            <div class="margin-circle-graphic">
+                                <div class="margin-text font-mono">MARGIN: 42%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subsystems Sidebar Grid (Power / Thermal / Comms) -->
+                <div class="twin-subsystems-trio">
+                    <!-- Power -->
+                    <div class="panel subsystem-card">
+                        <div class="panel-header">
+                            <h3 class="flex-icon"><span class="material-symbols-outlined text-amber">bolt</span> POWER</h3>
+                            <span class="badge badge-success">STABLE</span>
+                        </div>
+                        <div class="subsystem-values">
+                            <div>
+                                <span class="stat-label">BUS VOLTAGE</span>
+                                <div class="metric-value font-mono">28.4<span class="metric-unit">V</span></div>
+                            </div>
+                            <div>
+                                <span class="stat-label">TOTAL DRAW</span>
+                                <div class="metric-value font-mono" style="font-size:1.4rem">422<span class="metric-unit">W</span></div>
+                            </div>
+                        </div>
+                        <div class="bar-track" style="height:4px;margin-top:0.5rem"><div class="bar-fill blue" style="width:65%"></div></div>
+                    </div>
+
+                    <!-- Thermal -->
+                    <div class="panel subsystem-card">
+                        <div class="panel-header">
+                            <h3 class="flex-icon"><span class="material-symbols-outlined text-cyan">thermostat</span> THERMAL</h3>
+                        </div>
+                        <div class="grid-2col">
+                            <div class="sub-box font-mono"><span class="label">RAD A</span> <strong>-42.5°C</strong></div>
+                            <div class="sub-box font-mono"><span class="label">RAD B</span> <strong>-41.2°C</strong></div>
+                        </div>
+                        <div class="flex-between font-mono" style="margin-top:0.5rem">
+                            <span class="stat-label">TEMP DELTA (CORE)</span>
+                            <span class="text-amber">Δ 2.4°C</span>
+                        </div>
+                    </div>
+
+                    <!-- Comms -->
+                    <div class="panel subsystem-card">
+                        <div class="panel-header">
+                            <h3 class="flex-icon"><span class="material-symbols-outlined text-purple">satellite_alt</span> COMMS</h3>
+                            <span class="badge badge-cyan">AOS</span>
+                        </div>
+                        <div class="comms-rows font-mono">
+                            <div class="flex-between"><span>UPLINK</span><strong>64 kbps</strong></div>
+                            <div class="flex-between"><span>DOWNLINK</span><strong>2.4 Mbps</strong></div>
+                            <div class="flex-between border-t" style="padding-top:0.25rem"><span>SIGNAL / NOISE</span><strong class="text-cyan">14.2 dB</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engineering Console Stats Banner -->
+            <div class="stats-banner twin-console" style="margin-top:1rem">
+                <div class="stat-card">
+                    <span class="stat-label">Mission Clock</span>
+                    <span class="stat-value" id="twin-clock" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">simulated seconds</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Reaction Wheel Momentum</span>
+                    <span class="stat-value" id="twin-rw" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">Nms</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Battery SOC</span>
+                    <span class="stat-value" id="twin-battery" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">state of charge</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Thermal</span>
+                    <span class="stat-value" id="twin-thermal" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">bus temperature</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Power Draw</span>
+                    <span class="stat-value" id="twin-power" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">watts</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Comm Delay</span>
+                    <span class="stat-value" id="twin-comm" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">ms</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Sunlight</span>
+                    <span class="stat-value" id="twin-sunlight" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta">eclipse / illuminated</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Mission Health</span>
+                    <span class="stat-value" id="twin-health" style="font-size:1.1rem">—</span>
+                    <span class="stat-meta" id="twin-verification">—</span>
+                </div>
+            </div>
+
+            <!-- Telemetry Sparklines -->
+            <div class="orbit-grid">
+                <div class="panel">
+                    <div class="sparkline-wrap">
+                        <span class="sparkline-label">
+                            <span>Angular Rate ||ω|| — last 60 ticks</span>
+                            <span id="spark-omega-latest">—</span>
+                        </span>
+                        <canvas id="spark-omega"></canvas>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="sparkline-wrap">
+                        <span class="sparkline-label">
+                            <span>Battery SOC — last 60 ticks</span>
+                            <span id="spark-battery-latest">—</span>
+                        </span>
+                        <canvas id="spark-battery"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orbit Context SGP4 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Orbit Context</h3>
+                    <span class="badge badge-info">Real SGP4 propagation from imported TLE</span>
+                </div>
                 <div class="stats-banner">
                     <div class="stat-card">
-                        <span class="stat-label">cFS VERIFIER LATENCY</span>
-                        <span class="stat-value highlight-cyan" id="stat-verifier-time">—</span>
-                        <span class="stat-meta">5-Step Arithmetic Check</span>
+                        <span class="stat-label">Lat / Lon</span>
+                        <span class="stat-value" id="twin-latlon" style="font-size:1rem">—</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">GROUND Z3 SOLVE TIME</span>
-                        <span class="stat-value highlight-amber" id="stat-producer-time">—</span>
-                        <span class="stat-meta">Offloaded SMT Solver</span>
+                        <span class="stat-label">Altitude</span>
+                        <span class="stat-value" id="twin-altitude" style="font-size:1rem">—</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">COMPUTATIONAL ASYMMETRY</span>
-                        <span class="stat-value highlight-green" id="stat-asymmetry">—</span>
-                        <span class="stat-meta">Offloaded vs On-Board</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">COMMANDS VERIFIED / REJECTED</span>
-                        <span class="stat-value"><span id="pass-count">0</span> / <span id="drop-count" class="text-red">0</span></span>
-                        <span class="stat-meta" id="acceptance-meta">Live from /api/evaluation/report</span>
+                        <span class="stat-label">Orbital Period</span>
+                        <span class="stat-value" id="twin-period" style="font-size:1rem">—</span>
                     </div>
                 </div>
+                <p class="ops-note" id="twin-orbit-note">No TLE imported for this mission yet — import one below.</p>
+            </div>
 
-                <div class="panel" id="trust-panel">
+            <!-- Import TLE / OMM -->
+            <div class="orbit-grid">
+                <div class="panel ops-panel">
+                    <div class="panel-header"><h3>Import TLE</h3></div>
+                    <input type="text" id="import-tle-line1" placeholder="Line 1 (69 chars)" class="ops-input">
+                    <input type="text" id="import-tle-line2" placeholder="Line 2 (69 chars)" class="ops-input" style="margin-top:0.5rem">
+                    <div class="ops-btn-row" style="margin-top:0.5rem">
+                        <button class="btn btn-secondary" data-import="tle" data-dry="true">Validate</button>
+                        <button class="btn btn-primary" data-import="tle" data-dry="false">Import</button>
+                    </div>
+                    <pre class="json-code" id="import-tle-result" style="max-height:140px">Real NORAD mod-10 checksum validation.</pre>
+                </div>
+                <div class="panel ops-panel">
+                    <div class="panel-header"><h3>Import OMM (CCSDS)</h3></div>
+                    <textarea id="import-omm" class="ops-input ops-textarea" placeholder='{"NORAD_CAT_ID":"25544","EPOCH":"2024-01-01T12:00:00.000000",...}'></textarea>
+                    <div class="ops-btn-row" style="margin-top:0.5rem">
+                        <button class="btn btn-secondary" data-import="omm" data-dry="true">Validate</button>
+                        <button class="btn btn-primary" data-import="omm" data-dry="false">Import</button>
+                    </div>
+                    <pre class="json-code" id="import-omm-result" style="max-height:140px">Real SGP4 satellite-record construction check.</pre>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 7: MULTI-AGENT PIPELINE
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-pipeline" class="screen-view">
+
+            <!-- Observability Stats Bar -->
+            <div class="pipeline-stats-header">
+                <div>
+                    <h2 class="text-headline-md font-headline-md text-on-surface">Multi-Agent Pipeline Observatory</h2>
+                    <p class="text-body-sm font-body-sm text-on-surface-variant">Live telemetry and execution trace of the decentralized reasoning network.</p>
+                </div>
+                <div class="flex-chips">
+                    <div class="stat-chip">
+                        <span class="chip-dot cyan"></span>
+                        <span class="chip-label">PIPELINE LATENCY</span>
+                        <span class="chip-val cyan font-mono">420ms</span>
+                    </div>
+                    <div class="stat-chip emerald-bg">
+                        <span class="material-symbols-outlined text-emerald" style="font-size:14px">check_circle</span>
+                        <span class="chip-label text-emerald">SYSTEM CONFIDENCE</span>
+                        <span class="chip-val text-emerald font-mono">99.9%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Propagation Node Flow -->
+            <div class="panel active-propagation-panel">
+                <h3 class="panel-title-sub">ACTIVE PROPAGATION</h3>
+                <div class="pipeline-nodes-flow">
+                    <div class="pipeline-node">
+                        <div class="node-circle complete"><span class="material-symbols-outlined">route</span></div>
+                        <span class="node-label">Planner</span>
+                    </div>
+                    <div class="node-line active"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle complete"><span class="material-symbols-outlined">speed</span></div>
+                        <span class="node-label">Dynamics</span>
+                    </div>
+                    <div class="node-line active"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle active warning"><span class="material-symbols-outlined">security</span></div>
+                        <span class="node-label amber font-semibold">Safety</span>
+                    </div>
+                    <div class="node-line"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle proof-active"><span class="material-symbols-outlined">calculate</span></div>
+                        <span class="node-label">Proof</span>
+                    </div>
+                    <div class="node-line"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle"><span class="material-symbols-outlined">rule</span></div>
+                        <span class="node-label">Reviewer</span>
+                    </div>
+                    <div class="node-line"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle"><span class="material-symbols-outlined">satellite_alt</span></div>
+                        <span class="node-label">NASA cFS</span>
+                    </div>
+                    <div class="node-line"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle"><span class="material-symbols-outlined">fact_check</span></div>
+                        <span class="node-label">Verifier</span>
+                    </div>
+                    <div class="node-line"></div>
+                    <div class="pipeline-node">
+                        <div class="node-circle"><span class="material-symbols-outlined">flag</span></div>
+                        <span class="node-label">Accepted</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Deep Dive Bento Grid -->
+            <div class="agent-bento-grid">
+                <!-- Col 1: Roster List -->
+                <div class="panel agent-roster-col">
                     <div class="panel-header">
-                        <h2>Mission Trust Assessment</h2>
-                        <span class="badge" id="trust-overall-badge">—</span>
+                        <span class="panel-title-sub">AGENT ROSTER</span>
+                        <span class="badge badge-info">8 ACTIVE</span>
                     </div>
-                    <ul class="trust-checklist" id="trust-checklist"></ul>
-                    <div class="farkas-math-box">
-                        <span class="math-title">Explainable AI — why this verdict:</span>
-                        <code class="math-expr" id="explain-narrative">Propose a maneuver to see a live trust assessment.</code>
-                    </div>
-                </div>
-            </section>
+                    <div class="roster-list">
+                        <button class="roster-item">
+                            <div class="roster-item-top">
+                                <strong>Planner Agent</strong>
+                                <span class="status-dot green"></span>
+                            </div>
+                            <div class="roster-item-meta font-mono">
+                                <span>LAT: 12ms</span><span>CONF: 99%</span>
+                            </div>
+                        </button>
 
-            <!-- Screen 2: Interactive Maneuver Planner (AI Agent Sandbox) -->
-            <section id="screen-sandbox" class="screen-view">
-                <div class="sandbox-grid">
-                    <div class="panel controls-panel">
-                        <div class="panel-header">
-                            <h2>AI Agent Maneuver Proposal Sandbox</h2>
-                            <span class="badge badge-info">Interactive Parameter Controls</span>
-                        </div>
+                        <button class="roster-item">
+                            <div class="roster-item-top">
+                                <strong>Dynamics Agent</strong>
+                                <span class="status-dot green"></span>
+                            </div>
+                            <div class="roster-item-meta font-mono">
+                                <span>LAT: 45ms</span><span>CONF: 98%</span>
+                            </div>
+                        </button>
 
-                        <div class="slider-group">
-                            <label>Initial Angular Velocity ω_x (rad/s): <span id="val-wx">0.010</span></label>
-                            <input type="range" id="slider-wx" min="-0.05" max="0.05" step="0.005" value="0.010">
-                        </div>
-                        <div class="slider-group">
-                            <label>Initial Angular Velocity ω_y (rad/s): <span id="val-wy">0.010</span></label>
-                            <input type="range" id="slider-wy" min="-0.05" max="0.05" step="0.005" value="0.010">
-                        </div>
-                        <div class="slider-group">
-                            <label>Proposed RCS Thrust Torque u_x (Nm): <span id="val-ux">0.001</span></label>
-                            <input type="range" id="slider-ux" min="-0.05" max="0.05" step="0.001" value="0.001">
-                        </div>
-                        <div class="slider-group">
-                            <label>Proposed RCS Thrust Torque u_y (Nm): <span id="val-uy">-0.002</span></label>
-                            <input type="range" id="slider-uy" min="-0.05" max="0.05" step="0.001" value="-0.002">
-                        </div>
+                        <button class="roster-item active amber">
+                            <div class="roster-item-top">
+                                <strong class="text-amber">Safety Evaluator</strong>
+                                <span class="status-dot amber"></span>
+                            </div>
+                            <div class="roster-item-meta font-mono text-amber">
+                                <span>LAT: 180ms</span><span>CONF: 82%</span>
+                            </div>
+                        </button>
 
-                        <button class="btn btn-primary full-width" id="btn-calc-proof">
-                            Evaluate Z3 Proof & Test NASA cFS Verifier
+                        <button class="roster-item disabled">
+                            <div class="roster-item-top">
+                                <span>Proof Generator</span>
+                                <span class="status-dot gray"></span>
+                            </div>
+                            <div class="roster-item-meta font-mono">
+                                <span>AWAITING</span><span>--</span>
+                            </div>
+                        </button>
+
+                        <button class="roster-item disabled">
+                            <div class="roster-item-top">
+                                <span>NASA cFS Interface</span>
+                                <span class="status-dot gray"></span>
+                            </div>
+                            <div class="roster-item-meta font-mono">
+                                <span>AWAITING</span><span>--</span>
+                            </div>
                         </button>
                     </div>
+                </div>
 
-                    <div class="panel proof-output-panel">
-                        <div class="panel-header">
-                            <h2>Live Generated Farkas Certificate Payload</h2>
-                            <span class="badge badge-cyan">Schema v1.1</span>
+                <!-- Col 2: Safety Evaluator Deep Dive -->
+                <div class="panel agent-reasoning-col">
+                    <div class="panel-header">
+                        <h3 class="flex-icon text-amber"><span class="material-symbols-outlined">security</span> Safety Evaluator</h3>
+                        <span class="badge badge-warning">ANALYZING</span>
+                    </div>
+
+                    <div class="deepdive-block">
+                        <h4 class="sub-label">REASONING SUMMARY</h4>
+                        <p class="reasoning-p">Trajectory delta proposed by Planner Agent approaches thermal limits established in protocol <code class="font-mono text-cyan">TRM-889</code>. Simulating micro-meteoroid avoidance maneuver indicates a 14% increase in thruster burn duration. Checking constraint bounds against current payload mass parameters.</p>
+                    </div>
+
+                    <div class="deepdive-block">
+                        <h4 class="sub-label">DEPENDENCY TREE</h4>
+                        <div class="tree-box font-mono">
+                            <div class="tree-node"><span>▼</span> <span>Safety_Check_Seq_04</span></div>
+                            <div class="tree-node branch">├─ <span class="text-emerald">Valid(Planner_Input)</span></div>
+                            <div class="tree-node branch">├─ <span class="text-emerald">Valid(Dynamics_State)</span></div>
+                            <div class="tree-node branch">└─ <span class="text-amber">Eval(Thermal_Constraints)</span></div>
+                            <div class="tree-node sub-branch text-muted animate-pulse">└─ Awaiting Simulation Results...</div>
                         </div>
-                        <pre class="json-code" id="sandbox-json-display"></pre>
+                    </div>
+
+                    <div class="deepdive-block">
+                        <div class="flex-between sub-label">
+                            <span>EXECUTION PROGRESS</span>
+                            <span class="text-amber font-mono">74%</span>
+                        </div>
+                        <div class="bar-track" style="height:6px"><div class="bar-fill amber" style="width:74%"></div></div>
                     </div>
                 </div>
-            </section>
 
-            <!-- Screen: AI Agent Observatory + Multi-Agent Timeline -->
-            <section id="screen-observatory" class="screen-view">
-                <div class="panel feed-panel">
-                    <div class="panel-header">
-                        <h2>Multi-Agent Timeline</h2>
-                        <span class="badge badge-info">Planner → Dynamics → Safety → Proof Generator → Reviewer</span>
+                <!-- Col 3: Raw Payload I/O -->
+                <div class="panel agent-io-col">
+                    <div class="grid-2col stats-header">
+                        <div class="stat-cell font-mono"><span class="sub-label">LATENCY</span><strong class="text-amber">180.45 ms</strong></div>
+                        <div class="stat-cell font-mono"><span class="sub-label">CONFIDENCE</span><strong class="text-amber">82.11 %</strong></div>
                     </div>
-                    <div class="agent-observatory" id="agent-observatory">
-                        <p class="card-desc">Propose a maneuver to watch each agent's real inputs, outputs, latency, confidence, and reasoning.</p>
+
+                    <div class="payload-box">
+                        <div class="payload-header font-mono">
+                            <span>INPUT PAYLOAD</span>
+                            <span class="badge badge-info">JSON</span>
+                        </div>
+                        <pre class="json-code">
+{
+  "agent_id": "safety_eval_01",
+  "timestamp": 1715429810.114,
+  "state_vector": [42.114, -8.001, 102.55],
+  "proposed_action": {
+    "type": "thruster_burn",
+    "duration_sec": 14.5,
+    "axis": "+Z"
+  },
+  "constraints": ["thermal_limit_90C", "fuel_reserve_>10%"]
+}</pre>
+                    </div>
+
+                    <div class="payload-box">
+                        <div class="payload-header font-mono">
+                            <span>STREAMING OUTPUT</span>
+                            <span class="badge badge-warning animate-pulse">GENERATING</span>
+                        </div>
+                        <pre class="json-code">
+{
+  "status": "EVALUATING",
+  "checks_passed": 1,
+  "current_process": "thermal_sim",
+  "warnings": ["Burn duration extends nominal envelope by 2.1%"],
+  "action_safe": null_</pre>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Screen 3: Telemetry Stream -->
-            <section id="screen-timeline" class="screen-view">
-                <div class="panel feed-panel">
+            <!-- Multi-Agent Timeline (app.js populates into #agent-observatory) -->
+            <div class="panel feed-panel" style="margin-top:1rem">
+                <div class="panel-header">
+                    <h2>Multi-Agent Timeline Logs</h2>
+                    <span class="badge badge-info">Planner → Dynamics → Safety → Proof Generator → Reviewer</span>
+                </div>
+                <div class="agent-observatory" id="agent-observatory">
+                    <p class="card-desc">Loading last pipeline run…</p>
+                </div>
+            </div>
+
+            <!-- Engineering Agent History -->
+            <div class="panel" style="margin-top:1rem">
+                <div class="panel-header">
+                    <h3>Engineering Agent Execution History</h3>
+                    <span class="badge badge-info">Mission Intake, Spacecraft Config, Telemetry Analysis, Knowledge, Paper/Algorithm Review, Comparison</span>
+                </div>
+                <div class="table-container">
+                    <table class="cmd-table">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Version</th>
+                                <th>Status</th>
+                                <th>Latency</th>
+                                <th>Input</th>
+                                <th>When</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agent-runs-body">
+                            <tr><td colspan="6" class="card-desc">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 8: VERIFICATION
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-verification" class="screen-view">
+
+            <div class="verification-bento">
+
+                <!-- LEFT: Proof Verification -->
+                <div class="panel ver-col-left">
                     <div class="panel-header">
-                        <h2>NASA cFS Software Bus Message Stream</h2>
-                        <span class="badge badge-info">Message ID 0x1808 (Raw) -> 0x1809 (Verified)</span>
+                        <h3 class="flex-icon text-purple"><span class="material-symbols-outlined">shield_lock</span> Proof Verification</h3>
+                        <span class="badge badge-purple">Zk-SNARK</span>
+                    </div>
+
+                    <div class="cert-graphic-box">
+                        <div class="shield-icon-circle">
+                            <span class="material-symbols-outlined text-purple" style="font-size:32px">verified</span>
+                            <div class="orbit-ring-anim"></div>
+                        </div>
+                        <div class="cert-hash-details">
+                            <div class="font-mono font-bold text-primary">Zk-SNARK Validated</div>
+                            <div class="cert-hash-badge font-mono">0x7F8B...9A2C</div>
+                        </div>
+                        <div class="cert-stats-row font-mono">
+                            <div><span class="sub-label">PROOF SIZE</span><strong>1.24 KB</strong></div>
+                            <div><span class="sub-label">VERIFY TIME</span><strong>14ms</strong></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="sub-label border-b" style="padding-bottom:0.4rem;margin-bottom:0.5rem">Safety Properties</h4>
+                        <ul class="trust-checklist" id="trust-checklist"></ul>
+                    </div>
+
+                    <div style="margin-top:auto">
+                        <h4 class="sub-label">Constraint Matrix</h4>
+                        <div class="table-container">
+                            <table class="cmd-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="font-mono" style="font-size:0.68rem">THETA_MAX</td>
+                                        <td class="font-mono text-emerald text-right" style="font-size:0.68rem">✓ PASS</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono" style="font-size:0.68rem">PSI_RATE_LMT</td>
+                                        <td class="font-mono text-emerald text-right" style="font-size:0.68rem">✓ PASS</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono" style="font-size:0.68rem">PWR_DRAW_PEAK</td>
+                                        <td class="font-mono text-emerald text-right" style="font-size:0.68rem">✓ PASS</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CENTER: XAI Conflict Resolution -->
+                <div class="panel ver-col-center" id="trust-panel">
+                    <div class="panel-header">
+                        <h3 class="flex-icon text-amber"><span class="material-symbols-outlined">psychology</span> XAI: Conflict Resolution</h3>
+                        <span class="badge badge-danger" id="trust-overall-badge">CMD REJECTED</span>
+                    </div>
+
+                    <div class="stats-banner" style="grid-template-columns:1fr 1fr">
+                        <div class="stat-card">
+                            <span class="stat-label">cFS Verifier Latency</span>
+                            <span class="stat-value highlight-cyan" id="stat-verifier-time">—</span>
+                            <span class="stat-meta">5-Step Arithmetic Check</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Ground Z3 Solve Time</span>
+                            <span class="stat-value highlight-amber" id="stat-producer-time">—</span>
+                            <span class="stat-meta">Offloaded SMT Solver</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Computational Asymmetry</span>
+                            <span class="stat-value highlight-green" id="stat-asymmetry">—</span>
+                            <span class="stat-meta">Offloaded vs On-Board</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Commands Verified / Rejected</span>
+                            <span class="stat-value">
+                                <span id="pass-count">0</span> / <span id="drop-count" class="text-red">0</span>
+                            </span>
+                            <span class="stat-meta">Live from /api/evaluation/report</span>
+                        </div>
+                    </div>
+
+                    <!-- Attempted Directive — real command_id + real proposed torque vector -->
+                    <div class="directive-box">
+                        <div class="sub-label text-red flex-icon mb-1"><span class="material-symbols-outlined">code</span> Attempted Directive</div>
+                        <div class="code-line font-mono">
+                            <span class="badge badge-info">EXEC</span>
+                            <span id="trust-directive">Propose a maneuver on Mission Planning to see the real attempted command here.</span>
+                        </div>
+                    </div>
+
+                    <!-- Real verifier verdict, from the live /api/commands/propose response -->
+                    <div class="violation-card" id="trust-verdict-card">
+                        <span class="sub-label" id="trust-verdict-label">Verifier Verdict</span>
+                        <div class="text-red font-mono flex-icon" style="margin-top:0.35rem" id="trust-verdict-detail">
+                            <span class="material-symbols-outlined">info</span> No command proposed yet this session.
+                        </div>
+                    </div>
+
+                    <!-- XAI Narrative & Detail -->
+                    <div class="farkas-math-box">
+                        <span class="math-title">Explainable AI Narrative:</span>
+                        <code class="math-expr" id="explain-narrative">Propose a maneuver on Mission Planning to see a live trust assessment.</code>
+                    </div>
+
+                    <div style="flex:1;display:flex;flex-direction:column;gap:0.5rem">
+                        <span class="sub-label">Proof Certificate Detail</span>
+                        <pre class="json-code" id="proof-detail" style="max-height:220px">Propose and verify a command on Mission Planning to see full Farkas certificate detail here.</pre>
+                    </div>
+                </div>
+
+                <!-- RIGHT: System Health -->
+                <div class="panel ver-col-right">
+                    <div class="panel-header">
+                        <h3 class="flex-icon text-cyan"><span class="material-symbols-outlined">monitor_heart</span> Sys Health</h3>
+                    </div>
+
+                    <div class="health-gauges">
+                        <div class="gauge-card">
+                            <div class="flex-between font-mono"><span class="sub-label">CPU LOAD</span><strong>42%</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill cyan" style="width:42%"></div></div>
+                        </div>
+
+                        <div class="gauge-card">
+                            <div class="flex-between font-mono"><span class="sub-label">MEM USAGE</span><strong>8.4 / 16 GB</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill blue" style="width:52%"></div></div>
+                        </div>
+
+                        <div class="gauge-card">
+                            <div class="flex-between font-mono"><span class="sub-label">QUEUE DEPTH</span><strong class="text-amber">14 msgs</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill amber" style="width:28%"></div></div>
+                        </div>
+
+                        <div class="flex-between border-t border-b" style="padding:0.5rem 0;margin-top:0.5rem">
+                            <span class="sub-label">VERIFY LATENCY</span>
+                            <span class="badge badge-success font-mono">12ms</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:1rem">
+                        <h4 class="sub-label" style="margin-bottom:0.5rem">Uplink Status</h4>
+                        <div class="uplink-list">
+                            <div class="uplink-item">
+                                <span class="flex-icon font-mono text-sm"><span class="material-symbols-outlined">cable</span> WSS Stream</span>
+                                <span class="status-dot green"></span>
+                            </div>
+                            <div class="uplink-item">
+                                <span class="flex-icon font-mono text-sm"><span class="material-symbols-outlined">memory</span> NASA cFS Core</span>
+                                <span class="status-dot green"></span>
+                            </div>
+                            <div class="uplink-item">
+                                <span class="flex-icon font-mono text-sm"><span class="material-symbols-outlined">database</span> State DB Sync</span>
+                                <span class="status-dot green"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Audit Chain + Attack Library -->
+            <div class="orbit-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Tamper-Evident Audit Chain</h3>
+                        <span class="badge badge-info">Hash-chain over accepted commands</span>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-load-audit">Verify Chain Integrity</button>
+                    <div id="audit-result"></div>
+                    <div class="table-container">
+                        <table class="cmd-table">
+                            <thead>
+                                <tr>
+                                    <th>Seq</th>
+                                    <th>Command</th>
+                                    <th>Chain Hash</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-chain-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Adversarial Verification — Attack Library</h3>
+                    </div>
+                    <div class="security-grid" id="attack-library-grid">
+                        <p class="card-desc">Loading attack scenarios…</p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 9: REPLAY
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-replay" class="screen-view">
+
+            <!-- Replay Feed — the only real data source this screen has: every real
+                 command + its real verdict/narrative, scoped to the active mission. -->
+            <div class="panel feed-panel">
+                <div class="panel-header">
+                    <h2>Mission Replay Command Execution Stream</h2>
+                    <span class="badge badge-info">Scoped to active mission</span>
+                    <button class="btn btn-secondary btn-sm" id="btn-load-replay" style="margin-left:auto">
+                        <span class="material-symbols-outlined">refresh</span> Reload
+                    </button>
+                </div>
+                <div id="replay-list"><p class="card-desc">Loading replay stream…</p></div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 10: KNOWLEDGE
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-knowledge" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Mission Knowledge Agent</h2>
+                    <span class="badge badge-info">Grounded — cites [filename, page/section], refuses if no evidence exists</span>
+                </div>
+                <div class="ops-btn-row">
+                    <div class="knowledge-search-wrap">
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="text" id="knowledge-question" class="ops-input" placeholder="Ask a question about the uploaded documents...">
+                    </div>
+                    <button class="btn btn-primary" id="btn-ask-knowledge">Ask</button>
+                </div>
+                <div id="knowledge-answer"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Keyword Search</h3>
+                    <span class="badge badge-info">Real term-frequency search</span>
+                </div>
+                <div class="ops-btn-row">
+                    <div class="knowledge-search-wrap">
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="text" id="doc-search-query" class="ops-input" placeholder="Search across uploaded documents...">
+                    </div>
+                    <button class="btn btn-secondary" id="btn-search-documents">Search</button>
+                </div>
+                <div id="doc-search-results"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Scientific Review</h2>
+                    <span class="badge badge-info">Paper / Algorithm Review, Comparison</span>
+                </div>
+                <p class="card-desc">Click "Paper" or "Algorithm" next to a file on Mission Files to review it, or compare two document IDs below.</p>
+                <div class="ops-btn-row">
+                    <input type="text" id="compare-doc-a" class="ops-input" placeholder="Document ID A" style="flex:1">
+                    <input type="text" id="compare-doc-b" class="ops-input" placeholder="Document ID B" style="flex:1">
+                    <button class="btn btn-primary" id="btn-compare-documents">Compare</button>
+                </div>
+                <pre class="json-code" id="scientific-review-result">Run a review or comparison to see grounded, cited output here.</pre>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 11: REPORTS
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-reports" class="screen-view">
+
+            <div class="panel ops-panel">
+                <div class="panel-header">
+                    <h2>Mission Analytics</h2>
+                    <span class="badge badge-info" id="analytics-mission-label">—</span>
+                </div>
+                <div class="stats-banner" id="ops-analytics-stats">
+                    <p class="card-desc">Loading…</p>
+                </div>
+
+                <div style="border-top:1px solid var(--border);padding-top:0.85rem;margin-top:0.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                        <span style="font-family:var(--font-display);font-size:0.88rem;font-weight:600;color:var(--text-primary)">Command Verdict History</span>
+                        <span class="badge badge-info">Real accepted/rejected outcomes</span>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="verdict-history-chart"></canvas>
+                        <p class="card-desc" id="verdict-history-empty" style="display:none">No commands proposed yet for this mission — propose a maneuver on Mission Planning to populate this history.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="orbit-grid">
+                <div class="panel ops-panel">
+                    <div class="panel-header">
+                        <h2>Mission Compare</h2>
+                        <span class="badge badge-info">Real per-mission analytics</span>
+                    </div>
+                    <div class="ops-btn-row">
+                        <input type="text" id="compare-mission-ids" class="ops-input" placeholder="mission ids, comma separated e.g. 1,2,3" style="flex:1">
+                        <button class="btn btn-secondary" id="btn-run-compare">Compare</button>
                     </div>
                     <div class="table-container">
                         <table class="cmd-table">
                             <thead>
                                 <tr>
-                                    <th>COMMAND ID</th>
-                                    <th>PROPERTY</th>
-                                    <th>STATUS</th>
-                                    <th>VERIFIER TIME</th>
-                                    <th>SOLVER TIME</th>
-                                    <th>TIMESTAMP</th>
-                                    <th>REASON</th>
+                                    <th>Mission ID</th>
+                                    <th>Commands</th>
+                                    <th>Accept %</th>
+                                    <th>Avg Verifier ms</th>
+                                    <th>Attacks Detected</th>
                                 </tr>
                             </thead>
-                            <tbody id="timeline-body"></tbody>
+                            <tbody id="compare-body"></tbody>
                         </table>
                     </div>
                 </div>
-            </section>
 
-            <!-- Screen 4: Attack Library -->
-            <section id="screen-security" class="screen-view">
-                <div class="security-grid" id="attack-library-grid">
-                    <p class="card-desc">Loading attack scenarios from the backend…</p>
-                </div>
-            </section>
-
-            <!-- Screen: Mission Replay -->
-            <section id="screen-replay" class="screen-view">
-                <div class="panel feed-panel">
+                <div class="panel ops-panel">
                     <div class="panel-header">
-                        <h2>Mission Replay</h2>
-                        <span class="badge badge-info">Every command, proof, rejection, and attack — from the database</span>
+                        <h2>Mission Reports</h2>
+                        <span class="badge badge-info">Deterministic report snapshots</span>
                     </div>
-                    <button class="btn btn-secondary" id="btn-load-replay">Load Mission History</button>
-                    <div id="replay-list"></div>
+                    <button class="btn btn-secondary" id="btn-generate-report">Generate Deterministic Report</button>
+                    <div id="ops-reports-list"></div>
                 </div>
-            </section>
-        </main>
-    </div>
+            </div>
 
-    <script src="app.js"></script>
+            <!-- Mission Assistant Narrator Card -->
+            <div class="panel ops-panel">
+                <div class="panel-header">
+                    <h2>Mission Assistant Narrator</h2>
+                    <span class="badge badge-info" id="assistant-generated-by">Claude — narrates real data, never verifies</span>
+                </div>
+                <textarea id="assistant-question" class="ops-input ops-textarea" placeholder="Ask about this mission's status, telemetry, or a rejected command..."></textarea>
+                <button class="btn btn-primary" id="btn-ask-assistant">Ask Assistant</button>
+                <div class="farkas-math-box" id="assistant-answer-box" style="display:none;margin-top:0.75rem">
+                    <span class="math-title">Assistant Narrative (<span id="assistant-answer-source"></span>):</span>
+                    <code class="math-expr" id="assistant-answer"></code>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 12: EVIDENCE
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-evidence" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Evidence Package</h2>
+                    <span class="badge badge-info">Mission + commands + certificates + verification + audit + imports + reports</span>
+                </div>
+                <button class="btn btn-primary" id="btn-download-evidence">Download Evidence Package (JSON)</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Mission Timeline</h3>
+                    <span class="badge badge-info">Commands + imports, merged chronologically</span>
+                </div>
+                <div id="ops-timeline-list"><p class="card-desc">Loading…</p></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h3>Import History</h3></div>
+                <div class="table-container">
+                    <table class="cmd-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Filename</th>
+                                <th>Records</th>
+                                <th>Checksum</th>
+                                <th>Source</th>
+                                <th>Schema</th>
+                                <th>Imported At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="import-history-body">
+                            <tr><td colspan="7" class="card-desc">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SCREEN 13: SETTINGS
+        ════════════════════════════════════════════════════════════ -->
+        <section id="screen-settings" class="screen-view">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Mission Profiles (Safety Envelopes)</h2>
+                    <span class="badge badge-info">Seeded safety envelopes</span>
+                </div>
+                <div id="settings-profiles-list" class="agent-observatory">
+                    <p class="card-desc">Loading…</p>
+                </div>
+            </div>
+
+            <div class="orbit-grid">
+                <div class="panel ops-panel">
+                    <div class="panel-header">
+                        <h3>Import Mission JSON</h3>
+                    </div>
+                    <textarea id="import-mission-json" class="ops-input ops-textarea" placeholder='{"objective": "..."}'></textarea>
+                    <div class="ops-btn-row">
+                        <button class="btn btn-secondary" data-import="mission-json" data-dry="true">Validate</button>
+                        <button class="btn btn-primary" data-import="mission-json" data-dry="false">Import</button>
+                    </div>
+                    <pre class="json-code" id="import-mission-json-result" style="max-height:140px">Select an option above.</pre>
+                </div>
+
+                <div class="panel ops-panel">
+                    <div class="panel-header">
+                        <h3>Import Constraint Profile</h3>
+                    </div>
+                    <textarea id="import-constraint" class="ops-input ops-textarea" placeholder='{"max_omega_rad_s":0.05,"power_reserve_w":8,"thermal_max_c":45,"thermal_min_c":-15}'></textarea>
+                    <div class="ops-btn-row">
+                        <button class="btn btn-secondary" data-import="constraint-profile" data-dry="true">Validate</button>
+                        <button class="btn btn-primary" data-import="constraint-profile" data-dry="false">Import</button>
+                    </div>
+                    <pre class="json-code" id="import-constraint-profile-result" style="max-height:140px">Select an option above.</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Mission Lifecycle</h2>
+                </div>
+                <div class="ops-btn-row">
+                    <select id="settings-mission-status" class="ops-input" style="width:auto">
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="PAUSED">PAUSED</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="ARCHIVED">ARCHIVED</option>
+                    </select>
+                    <button class="btn btn-primary" id="btn-set-mission-status">Update Status</button>
+                </div>
+                <p class="ops-note" id="settings-mission-status-note"></p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Plugin SDK — Future Safety Properties</h2>
+                    <span class="badge badge-info">SafetyPropertyPlugin interface</span>
+                </div>
+                <p class="card-desc">Exposes <code class="font-mono text-cyan">backend.plugins.base.SafetyPropertyPlugin</code> interface.</p>
+                <p class="card-desc" id="plugins-note">Loading registry state…</p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>System</h2></div>
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <span class="stat-label">Backend WebSocket</span>
+                        <span class="stat-value" id="settings-ws-status" style="font-size:1rem">—</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Active Mission ID</span>
+                        <span class="stat-value" id="settings-mission-id" style="font-size:1rem">—</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+</div>
+
+<div id="new-mission-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <h2>New Mission</h2>
+        <input type="text" id="new-mission-name-input" class="ops-input" placeholder="Mission name">
+        <div class="ops-btn-row">
+            <button class="btn btn-secondary" id="btn-new-mission-cancel">Cancel</button>
+            <button class="btn btn-primary" id="btn-new-mission-confirm">Create</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

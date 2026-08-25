@@ -1,7 +1,6 @@
 """Digital Twin REST + background streaming loop that persists real ticks and broadcasts them."""
 
 import asyncio
-import json
 
 from fastapi import APIRouter
 from sqlalchemy import desc, select
@@ -17,10 +16,21 @@ _twin = DigitalTwinState()
 _task: asyncio.Task | None = None
 TICK_SECONDS = 1.0
 
+# The Digital Twin is a single real physics simulation stream (see backend/digital_twin.py),
+# not one instance per mission. This tag records which mission is currently "open" in the
+# UI so its ticks are persisted under that mission's id — set via POST /api/missions/{id}/activate.
+_active_mission_id: int | None = None
+
+
+def set_active_mission(mission_id: int | None) -> None:
+    global _active_mission_id
+    _active_mission_id = mission_id
+
 
 def _write_tick(tick: dict) -> None:
     with engine.begin() as conn:
         conn.execute(telemetry.insert().values(
+            mission_id=_active_mission_id,
             spacecraft_id=None,
             omega_x=tick["omega_x"], omega_y=tick["omega_y"], omega_z=tick["omega_z"],
             reaction_wheel_momentum=tick["reaction_wheel_momentum"],
@@ -58,7 +68,10 @@ async def stop_digital_twin():
 
 
 @router.get("/latest")
-def latest(limit: int = 60):
+def latest(limit: int = 60, mission_id: int | None = None):
+    query = select(telemetry).order_by(desc(telemetry.c.id)).limit(limit)
+    if mission_id is not None:
+        query = query.where(telemetry.c.mission_id == mission_id)
     with engine.connect() as conn:
-        rows = conn.execute(select(telemetry).order_by(desc(telemetry.c.id)).limit(limit)).fetchall()
+        rows = conn.execute(query).fetchall()
     return [dict(r._mapping) for r in rows]

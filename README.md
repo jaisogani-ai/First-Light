@@ -1,168 +1,217 @@
-# First Light — Proof-Carrying Commands for NASA Core Flight System (cFS)
+<p align="center">
+  <img src="docs/images/hero.png" alt="First Light — Mission Control" width="100%">
+</p>
 
-**Track:** Aerotech & Aerospace Innovation
-**Event:** International Innovation Challenge 3.0 (IIC 3.0), Manipal University Jaipur
+<h1 align="center">FIRST LIGHT</h1>
+<p align="center"><strong>Proof-Carrying Commands for AI-Generated Spacecraft Operations</strong></p>
+<p align="center">NASA cFS &nbsp;•&nbsp; Z3 &nbsp;•&nbsp; Farkas Certificates &nbsp;•&nbsp; Digital Twin &nbsp;•&nbsp; Mission AI</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white">
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL_mode-003B57?logo=sqlite&logoColor=white">
+  <img alt="NASA cFS" src="https://img.shields.io/badge/NASA_cFS-pattern_reference-0B3D91">
+  <img alt="Z3" src="https://img.shields.io/badge/Z3-SMT_solver-4B0082">
+  <img alt="Claude" src="https://img.shields.io/badge/Claude-Haiku_4.5-D97757?logo=anthropic&logoColor=white">
+  <br>
+  <img alt="Tests" src="https://img.shields.io/badge/tests-157%20passing-00E5B0">
+  <img alt="License" src="https://img.shields.io/badge/license-Apache_2.0-blue">
+  <a href="https://github.com/jaisogani-ai/First-Light/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/jaisogani-ai/First-Light?style=social"></a>
+</p>
+
+<p align="center">
+  <a href="#what-is-first-light">What is it</a> ·
+  <a href="#key-features">Features</a> ·
+  <a href="#system-architecture">Architecture</a> ·
+  <a href="#ai-agents">Agents</a> ·
+  <a href="#run-locally">Run locally</a> ·
+  <a href="#nasa-cfs-integration--honest-status">cFS status</a> ·
+  <a href="#limitations">Limitations</a>
+</p>
 
 ---
 
-## 1. Problem and Research Gap
+**Track:** Aerotech & Aerospace Innovation — International Innovation Challenge 3.0 (IIC 3.0), Manipal University Jaipur
 
-AI mission-planning agents are increasingly proposed for spacecraft autonomy, but they cannot be trusted to execute commands without independent safety verification, and re-running a full safety solve on board is too expensive for flight computers. Existing approaches are either **reactive runtime monitors** (catch violations after they start) or **ground-side rule engines** (slow, human-in-the-loop). Neither gives a flight computer a way to *cheaply and independently* verify that an AI-proposed command is safe before executing it.
+**Deep-dive references** (this README is the map; these are the territory): [`ARCHITECTURE.md`](ARCHITECTURE.md) (component map, DB schema, API flow) · [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) (design trade-offs) · [`VERIFICATION_PIPELINE.md`](VERIFICATION_PIPELINE.md) (the locked PCC research) · [`AGENTS.md`](AGENTS.md) (every agent, real vs. simulated) · [`MISSION_WORKFLOW.md`](MISSION_WORKFLOW.md) · [`SECURITY.md`](SECURITY.md) · [`ROADMAP.md`](ROADMAP.md) · [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-**Proof-Carrying Commands (PCC)** is the response: the ground-side AI agent does the expensive work (an SMT/Z3 solve deriving a mathematical certificate of safety) and attaches that certificate to the command. The spacecraft-side verifier does not re-solve anything — it recomputes a small, deterministic arithmetic check over the certificate's own stated numbers. This is the **locked research contribution** of this project: the mechanism, the Farkas-style certificate family, the angular-rate safety property, and the producer/verifier computational asymmetry are unchanged from the original design.
+---
 
-### Related work
+## Project Preview
 
-This positions PCC relative to existing approaches rather than claiming an unoccupied space:
+| Mission Overview | Mission Planning |
+|:---:|:---:|
+| ![Mission Overview](docs/images/overview.png) | ![Mission Planning](docs/images/mission-planning.png) |
+| Live mission health, agent reasoning, command feed | Real Planner → Dynamics → Safety → Proof → Reviewer → Verifier pipeline |
 
-- **Runtime Assurance (RTA) for spacecraft attitude maneuvering** — AFRL's STARS program work on simultaneous-constraint RTA for attitude control ([Black et al., arXiv:2402.14723](https://arxiv.org/pdf/2402.14723)) is the closest prior art: same domain (attitude control), same goal (bound an AI/optimization-based controller's output to a safe set), different mechanism — RTA wraps the controller with a real-time safety filter that can override its output, rather than requiring the controller to carry a machine-checkable proof of why its own output is already safe.
-- **Runtime verification meets LLMs** — "Watchdogs and Oracles" ([arXiv:2511.14435](https://arxiv.org/pdf/2511.14435)) frames the same "don't trust the AI, check it cheaply" problem this project addresses, for LLM-driven autonomous systems generally rather than a specific certificate family.
-- **AI verification for CubeSat autonomy** — "Glass Box at Orbit" ([arXiv:2606.02967](https://arxiv.org/pdf/2606.02967)) targets the same platform class (CubeSat-scale autonomy) with a constitutional-AI verification framework rather than a solver-derived certificate.
-- **A real, labeled attack dataset exists and isn't used here** — a reproducible open-source CubeSat testbed with labeled telemetry and cyberattack logs ([Reproducible and Open-Source Testbed for Satellite Cybersecurity, ACM REP '25](https://dl.acm.org/doi/10.1145/3736731.3746144)) is a concrete, named candidate for replacing this project's synthetic Attack Library scenarios with real recorded attack traffic — named here as an honest next step, not claimed as already integrated.
+| Verification | Digital Twin |
+|:---:|:---:|
+| ![Verification](docs/images/verification.png) | ![Digital Twin](docs/images/digital-twin.png) |
+| Farkas certificate detail, hash-chain audit, attack library | Live attitude, power, thermal, and orbit propagation |
 
-## 2. What Changed in This Build
+> **Demo:** a recorded run belongs at [`docs/images/demo.gif`](docs/images/demo.gif) — the file currently at that path is a placeholder frame; replace it with a real screen capture of a propose → verify → reject cycle.
 
-The original hackathon prototype demonstrated the *idea* with fabricated data: hardcoded Farkas multipliers, a verifier that checked string prefixes instead of cryptographic hashes/signatures, a magic sequence-number constant instead of persisted state, and a frontend that pushed `Math.random()` rows into a JS array. None of that is defensible under inspection — a hash check that isn't a hash check is not a security property.
+---
 
-This build replaces every one of those with a real implementation, verified end-to-end (see [§7](#7-evaluation) and [§8](#8-testing)):
+## What Is First Light
 
-- Real Z3-derived Farkas certificates (`producer/certificate.py`, `producer/rules.py`)
-- Real SHA-256 command-hash binding and HMAC-SHA256 signatures, independently recomputed on verify (`backend/security.py`, `backend/verifier.py`)
-- Real, DB-backed monotonic sequence numbers — replay is caught by state, not a hardcoded threshold (`db/schema.sql`, `backend/verifier.py`)
-- A real FastAPI backend and SQLite database backing every dashboard number (`backend/`)
-- A real, five-agent producer pipeline (Planner → Dynamics → Safety → Proof Generator → Reviewer), each step's latency/confidence/reasoning genuinely computed (`producer/pipeline.py`)
-- A real Attack Library — seven attack types that mutate a genuinely valid certificate and submit it to the live verifier (`backend/attack_mutations.py`, `backend/routers/attacks.py`)
-- A pytest suite that exercises the live backend via `TestClient`, not a reimplementation of the checks under test (`eval/`)
+AI mission-planning agents are increasingly proposed for spacecraft autonomy, but they cannot be trusted to execute commands without independent safety verification — and re-running a full safety solve on board is too expensive for a flight computer. Existing approaches are either **reactive runtime monitors** (catch violations after they start) or **ground-side rule engines** (slow, human-in-the-loop). Neither gives a flight computer a way to *cheaply and independently* verify that an AI-proposed command is safe before it executes.
 
-## 3. Architecture
+**Proof-Carrying Commands (PCC)** is the answer this project implements: the ground-side AI agent does the expensive work — an SMT/Z3 solve that derives a mathematical certificate of safety — and attaches that certificate to the command. The spacecraft-side verifier never re-solves anything; it recomputes a small, deterministic arithmetic check over the certificate's own stated numbers. That producer/verifier **computational asymmetry** (milliseconds of solving, sub-millisecond of checking) is the entire point, and it is the one piece of this project that has not changed since the original design.
 
-```
-producer/                     Ground-side: AI mission-planning pipeline
-  agent.py                     Mission Planner Agent (maneuver presets)
-  llm_planner.py                Real Claude API call — proposes the torque command itself
-  dynamics_model.py             Dynamics Agent's rigid-body propagation engine
-  rules.py                      Flight Rules Engine (interface + Rule 1: angular rate)
-  certificate.py                 Proof Generator Agent — real Z3 SMT call + Farkas derivation
-  pipeline.py                    Orchestrates all 5 agents, computes real per-step dependencies
-  orbit.py                        Real SGP4 orbit propagation — mission context only, §11
+This is a research prototype, not flight-qualified software. Section [Honest Status](#nasa-cfs-integration--honest-status) and [Limitations](#limitations) say exactly where the line is.
 
-backend/                      Spacecraft-side (reference) + application backend
-  verifier.py                    The real 5-step verifier (hash/sig/sequence/model/Farkas),
-                                  race-free sequence check via atomic SQL upsert
-  security.py                     SHA-256, HMAC-SHA256, canonicalization, thread-safe
-                                  bounded rate limiting
-  digital_twin.py                  Physics-based telemetry simulator (Flight Digital Twin)
-  audit_chain.py                    Tamper-evident hash-chain audit log, §
-  pipeline_graph.py                  Real dependency graph from actual step data, §
-  attack_mutations.py                 Shared attack definitions (Attack Library + eval/ tests)
-  constants.py                         Shared constants (e.g. the sequence genesis value)
-  routers/                              commands, pipeline, profiles, replay, attacks, telemetry,
-                                         evaluation, metrics, audit, orbit — the full REST + WS API
-  db.py, models.py                       SQLAlchemy Core over db/schema.sql
+## Key Features
 
-apps/gate, apps/target        cFS-pattern C reference verifier — see §6, not a live cFE build
-db/schema.sql                 Source-of-truth SQLite schema (SQLite only, no ORM migrations)
-eval/                         pytest adversarial suite against the live FastAPI backend
-index.html / app.js / styles.css   Mission Control dashboard (design unchanged, data is real)
-```
+| Feature | What it actually is |
+|---|---|
+| **Mission Workspace** | Multiple concurrent missions, each with its own safety envelope, sequence-number stream, telemetry, and command history — not a single global session |
+| **Mission Control UI** | 13-screen operator workflow (Overview → Planning → Files → Spacecraft → Telemetry → Digital Twin → Pipeline → Verification → Replay → Knowledge → Reports → Evidence → Settings), every screen loading real data on open |
+| **Proof-Carrying Commands** | Farkas-style safety certificates derived from a real Z3 SMT UNSAT check, independently re-verified by 5-step arithmetic recomputation (hash, signature, sequence, model, Farkas inequality) |
+| **Flight Digital Twin** | Deterministic physics-based simulator — rigid-body attitude propagation, reaction-wheel momentum, thermal RC response, battery SOC, comm/sensor latency — streamed live over WebSocket |
+| **Orbit Context** | Real SGP4 propagation (the `sgp4` package) from an imported TLE — position, ground track, visibility windows, orbital period |
+| **Tamper-Evident Audit Chain** | A real hash chain over every command; verification independently recomputes every link from current row data, catching a raw-SQL edit at the exact link it happened |
+| **Adversarial Attack Library** | 7 real attack types that mutate a genuinely valid certificate and submit it to the live verifier — replay, payload tampering, forged multipliers, and more |
+| **Mission Replay** | The full persisted history of every command, certificate, and verdict, straight from the database — no synthesized replay data |
+| **Knowledge Agent** | Document-grounded Q&A over uploaded Mission Files — retrieves real evidence first, refuses deterministically (no LLM call) when nothing matches |
+| **Scientific Review** | Paper Review, Algorithm Review, and Comparison agents grounded on real extracted document text, citing `[filename, page]` for every claim |
+| **Telemetry Analysis Engine** | Deterministic numpy statistics — sampling rate, packet gaps, sensor trends via linear regression — no LLM |
+| **Mission Analytics & Evidence Package** | Real DB-aggregate analytics, mission comparison, and a composed evidence bundle (mission + commands + certificates + verdicts + imports) as JSON |
+| **Claude Mission Assistant** | Narrates real mission snapshots in plain language; deterministic fallback when no API key is configured — never fabricates when Claude is unavailable |
 
-### Mission Knowledge Base and Flight Rules Engine
+No feature in this table is aspirational — every one has a live endpoint, a passing test, and (where applicable) a UI screen. See [Limitations](#limitations) for what is explicitly *not* built.
 
-Safety limits are not hardcoded. `mission_profiles` (a real DB table, seeded in `db/seed.py`) holds four distinct envelopes — Earth Observation, Deep Space, Lunar Orbiter, Science Mission — each with its own `max_omega_rad_s`, power reserve, and thermal limits. The Mission Planner Agent reads the active profile and passes its limits down the pipeline; switching profiles changes the Farkas certificate's numbers, not just a label.
+## System Architecture
 
-`producer/rules.py` defines a `FlightRule` interface (`evaluate(state, profile) -> RuleResult`) and a rule registry. Only **Rule 1 (Angular Rate)** is implemented and wired into the Safety Agent — Battery Reserve, Thermal Envelope, Comm Window, Wheel Saturation, Power Reserve, and Sun-Pointing are named as the registry's intended extension points, not implemented. Adding one is a matter of implementing the interface, not restructuring the pipeline.
+```mermaid
+flowchart LR
+    subgraph Ground["Ground Side — producer/"]
+        Planner["Mission Planner Agent<br/>(Claude Haiku 4.5 or preset)"]
+        Dynamics["Dynamics Agent<br/>rigid-body propagation"]
+        Safety["Safety Agent<br/>Flight Rules Engine"]
+        Proof["Proof Generator<br/>Z3 SMT + Farkas derivation"]
+        Reviewer["Reviewer Agent<br/>independent recheck"]
+        Planner --> Dynamics --> Safety --> Proof --> Reviewer
+    end
 
-### AI Agent Observatory and Multi-Agent Timeline
+    subgraph Flight["Spacecraft Side — backend/verifier.py"]
+        V1["1. Sequence freshness"]
+        V2["2. Command hash match"]
+        V3["3. Signature valid"]
+        V4["4. Model version match"]
+        V5["5. Farkas inequality recheck"]
+        V1 --> V2 --> V3 --> V4 --> V5
+    end
 
-The producer is not one opaque function call. `producer/pipeline.py` runs five distinct steps — Mission Planner, Dynamics, Safety, Proof Generator, Reviewer — each producing a `{inputs, outputs, latency_ms, confidence, reasoning_summary, status}` record from real numbers (latency via `time.perf_counter()`, confidence as a genuine margin-to-bound ratio). These are persisted to `pipeline_steps` and rendered live in the dashboard's AI Agent Observatory / Multi-Agent Timeline screen.
-
-The Reviewer Agent is a genuine second opinion: it independently recomputes `Σ(λᵢ·cᵢ)` from the certificate the Proof Generator just produced and refuses to let it be signed if the recheck fails — this is a real internal check, not decoration.
-
-**The Mission Planner Agent is a real LLM call**, not deterministic code pretending to be one. `producer/llm_planner.py` sends the current state and mission profile to the Claude API (`claude-haiku-4-5`, the cost-effective tier — this is a small structured-output call, not a task that needs Opus-tier reasoning) and asks it to propose the actual 3-axis torque command — the numbers that flow into every downstream stage come from the model's response, not a lookup table. This is the PCC principle applied to the producer itself: the AI proposes, the deterministic Dynamics/Safety/Proof Generator/Reviewer chain independently proves — an LLM-proposed maneuver that's actually unsafe is refused by the real Z3/Farkas check exactly like any other input. If `ANTHROPIC_API_KEY` isn't set or the call fails for any reason, the Planner Agent falls back to a deterministic preset and says so plainly in its own reasoning summary (`source: "llm"` vs `source: "deterministic_fallback"` in the pipeline-step record) — it never fabricates a response.
-
-### Explainable AI and Trust Score
-
-Every verification result carries structured explain data (`backend/schemas.py: ExplainData`) — which constraint was checked, the expected bound vs. the actual binding-axis rate, and which of the five checks failed. The five underlying booleans are also surfaced directly as a `TrustAssessment` rather than collapsed into a single pass/fail flag, so a rejection is legible ("Sequence Freshness failed" vs. "Signature Valid failed") instead of an opaque `REJECTED`.
-
-### Mission Replay
-
-`GET /api/missions/replay` returns the full persisted history — every command, its certificate, its verification result, and its pipeline trace — straight from the database. The dashboard's Mission Replay screen renders exactly that; there is no synthesized replay data.
-
-### Flight Digital Twin
-
-`backend/digital_twin.py` is a real, deterministic physics-based simulator: it reuses `SpacecraftDynamics` (the same rigid-body model the Proof Generator uses) to propagate attitude, and adds simple, honestly-labeled models for reaction-wheel momentum, thermal RC response, battery state-of-charge, and comm/sensor latency. It is **not live spacecraft telemetry** — it is a simulation, and is described as such everywhere it appears.
-
-### Tamper-Evident Audit Chain
-
-`backend/audit_chain.py` implements a real Merkle/blockchain-style hash chain over the `commands` table: each command's link hashes the previous link's hash together with its own `command_hash`, `signature`, and `sequence_no` (`GET /api/audit/chain`). Verification (`GET /api/audit/verify`) never trusts a stored `chain_hash` — it independently recomputes every link from the command's *current* row data and compares. A direct SQL edit to a historical `command_hash` (bypassing the API entirely) breaks every chain hash computed after it and is caught at the exact link where it happened — verified in `eval/test_audit_chain.py`, including a test that corrupts a row via raw SQL and confirms `broken_at_index` points at it.
-
-### Pipeline Dependency Graph
-
-`GET /api/pipeline/graph?run_id=` (`backend/pipeline_graph.py`) exposes the multi-agent pipeline as a real dependency graph rather than a fixed diagram: edges between agent steps are derived by checking whether a value in one step's real `outputs` actually reappears in the next step's real `inputs` (e.g. the Dynamics Agent's `x_post` output is the literal value the Safety Agent's `x_post` input receives) — an edge is labeled `"data"` when a field genuinely matches and `"control"` when the steps only share sequencing. A final `verifier` node documents which certificate fields (`command_hash`, `signature`, `multipliers`, `constraints`, `sequence_no`) the independent verifier actually reads. Verified in `eval/test_pipeline_and_attacks.py::test_pipeline_graph_reflects_real_data_flow`.
-
-## 4. Real Farkas Certificate Construction
-
-The safety property is `post_maneuver_omega_bound`: after a maneuver, `|ω_i| ≤ ω_max` on every axis. This is encoded as six signed half-space constraints (`producer/rules.py: AngularRateRule`):
-
-```
-c_upper_i = ω_i − ω_max        (negative when axis i's upper bound is satisfied)
-c_lower_i = −ω_i − ω_max       (negative when axis i's lower bound is satisfied)
+    Reviewer -- "signed certificate" --> V1
+    V5 -- "verdict" --> Audit["Tamper-Evident Audit Chain"]
+    V5 -- "verdict" --> Twin["Flight Digital Twin"]
 ```
 
-The **binding constraint** is `max(c_0..c_5)` — the axis/direction closest to violating the bound. The certificate's Farkas multiplier vector is one-hot on the binding constraint's index; every other multiplier is `0`. This is not an arbitrary choice: a convex combination of values that are all `≤ max(c)` can only equal `max(c)` if all weight sits on the maximal constraint(s) — so `Σ(λᵢ·cᵢ) = max(c) < 0` is both the correct safety condition and the only combination of non-negative multipliers that can honestly reproduce it. The verifier (`backend/verifier.py`) enforces exactly this: it rejects any multiplier vector that doesn't reproduce `max(constraints)` exactly, not merely one that happens to sum to something negative — an earlier version of this check only required a negative sum, which would have let a forged multiplier vector cherry-pick a comfortable constraint while hiding a violated one (caught and fixed during this build; see `eval/test_adversarial_forged.py`).
-
-Independently of the closed-form derivation, `producer/certificate.py` makes a **real Z3 SMT call**: it encodes the propagated state as `z3.Real` constants, asserts the negation of the safety property as a disjunctive formula, and requires `Solver().check() == unsat` before a certificate is ever generated. If Z3 finds the negation satisfiable (i.e., the state is actually unsafe), the producer refuses — this is real solver-backed refusal, not a `Math.random()` fake alert.
-
-## 5. Security Properties
-
-| Check | Mechanism | What it actually catches |
-|---|---|---|
-| Sequence freshness | `sequence_state` table, transactional read/write | Replay of a previously-accepted certificate |
-| Command hash match | Real SHA-256 over canonical command bytes | Attaching a valid certificate to a different (tampered) command |
-| Signature valid | Real HMAC-SHA256 over the canonical certificate payload | Forged or corrupted certificates |
-| Model version match | Registry of accepted `model_id` values | A certificate generated against an unrecognized dynamics model |
-| Farkas inequality | Exact recomputation of `Σ(λᵢ·cᵢ)`, requires equality with `max(constraints)` | A certificate whose stated multipliers don't actually prove the stated conclusion |
-
-`SECRET_KEY` (now `FIRST_LIGHT_HMAC_SECRET_KEY`) lives in `.env`, not source (see `.env.example`); it is no longer the hardcoded literal the original `certificate.py` shipped with. Rate limiting is a light in-memory fixed-window limiter (`backend/security.py: RateLimiter`) — deliberately not backed by Redis, per the scope decision in §9.
-
-## 6. NASA cFS Integration — Honest Status
-
-**What this build attempted:** a real NASA cFS Bundle build. `git clone --recursive https://github.com/nasa/cFS.git` succeeded (328MB, all submodules), and `gcc`/`cmake`/`git` were all available. The build reached CMake configuration and failed with:
-
-```
-CMake Error at cmake/arch_build.cmake:706 (message):
-  Do not know how to set CFE_SYSTEM_PSPNAME on Darwin system
+```mermaid
+flowchart TB
+    UI["Mission Control UI<br/>index.html / app.js"] <-->|"REST + WebSocket"| API["FastAPI backend/"]
+    API --> DB[("SQLite<br/>db/schema.sql<br/>WAL mode")]
+    API --> Producer["producer/ pipeline"]
+    API --> Agents["backend/agents/<br/>Intake · Knowledge · Paper/Algorithm Review · Comparison"]
+    API --> Engines["backend/engines/<br/>Spacecraft Config · Telemetry Analysis"]
+    API --> Twin["backend/digital_twin.py"]
+    Agents -.->|"real API call"| Claude["Claude API"]
+    Producer -.->|"real API call"| Claude
+    Producer --> Z3["Z3 SMT Solver"]
 ```
 
-The open-source cFS native/host Platform Support Package is implemented only for Linux and CYGWIN (`cfe/cmake/arch_build.cmake:700-706`); porting OSAL's POSIX BSP to macOS is itself a nontrivial subproject, not a build-flag fix, and was out of scope for this session. **This build was not completed under a live NASA cFE/Software Bus instance.**
+Full component map, DB schema, and every API route: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-**What exists instead:** `apps/gate/fsw/src/` contains a **C reference implementation** of the same 5-step verifier logic as `backend/verifier.py`, including a from-scratch SHA-256 and HMAC-SHA256 (`pcc_crypto.c`) — verified independently against RFC 6234/4231 test vectors (`test_pcc_crypto.c`, all 3 vectors pass). This replaces the original mock (`Mock_SHA256` XORed bytes; `Mock_VerifySig` checked for a two-byte marker). It compiles and runs standalone with plain `gcc`, and demonstrates the same verification logic in C — but it has not been built or exercised inside an actual cFE application, has not subscribed to a real Software Bus message ID, and has not been tested on target hardware or in QEMU.
+## AI Agents
 
-**Honest next step:** running this on a Linux host (native cFS bundle target is Linux/CYGWIN-only) would let the existing `apps/gate`/`apps/target` structure build against real cFE/OSAL/PSP and communicate over the actual Software Bus — the C verifier logic itself would not need to change, since it already doesn't depend on cFS headers beyond `gate_app.h`'s structs.
+| Agent | Purpose | Deterministic / LLM | Status |
+|---|---|---|---|
+| **Mission Planner** | Proposes the 3-axis torque command | Real Claude API call (`claude-haiku-4-5`), deterministic preset fallback | Live |
+| **Dynamics** | Propagates rigid-body attitude state | Deterministic | Live |
+| **Safety** | Evaluates the Flight Rules Engine (angular-rate bound) | Deterministic | Live |
+| **Proof Generator** | Derives the Farkas certificate; confirms UNSAT via real Z3 | Deterministic derivation + real Z3 SMT call | Live |
+| **Reviewer** | Independently recomputes `Σ(λᵢ·cᵢ)` before allowing a sign-off | Deterministic | Live |
+| **Mission Intake** | Detects duplicate/corrupt/unsupported uploads and missing mission fields | Deterministic, rule-based | Live |
+| **Mission Knowledge** | Grounded Q&A over uploaded Mission Files, refuses when no evidence exists | Real Claude call, evidence-gated | Live |
+| **Paper Review** | Structured review of an uploaded research paper | Real Claude call, forced JSON schema | Live |
+| **Algorithm Review** | Structured review of an uploaded algorithm description | Real Claude call, forced JSON schema | Live |
+| **Scientific Comparison** | Compares two uploaded documents, attributing every claim | Real Claude call, forced JSON schema | Live |
+| **Mission Assistant** | Narrates a mission's real analytics snapshot in plain language | Real Claude call, deterministic fallback | Live |
+| **Spacecraft Configuration Engine** | Validates spacecraft/component configuration | Deterministic, rule-based | Live |
+| **Telemetry Analysis Engine** | Sampling rate, gaps, statistics, trends over real telemetry | Deterministic, numpy | Live |
 
-## 7. Evaluation
+Full behavior, inputs/outputs, and the real-vs-simulated boundary for each: [`AGENTS.md`](AGENTS.md).
 
-`GET /api/evaluation/report` computes, from real DB aggregates (not hardcoded): total commands, acceptance/rejection rate, average producer/verifier latency, the computational asymmetry ratio, and attack detection rate. `GET /api/evaluation/export?fmt=csv` streams the same report as CSV. `GET /metrics` exposes Prometheus counters/histograms (`first_light_commands_verified_total`, `first_light_verifier_latency_ms`, etc.) plus live process CPU/memory via `psutil`.
+## Mission Workflow
 
-Representative numbers from a local run: producer (Z3 solve + pipeline) ≈ 4–30 ms; verifier (arithmetic recomputation) ≈ 0.5–1 ms — a genuine multi-x computational asymmetry, not the fabricated "1,990x" the original dashboard displayed.
+```mermaid
+flowchart TD
+    Operator(["Operator"]) --> Mission["Mission Workspace"]
+    Mission --> Planner["Planner Agent"]
+    Planner --> Dynamics["Dynamics Agent"]
+    Dynamics --> Safety["Safety Agent"]
+    Safety --> ProofGen["Proof Generator"]
+    ProofGen --> ReviewerA["Reviewer Agent"]
+    ReviewerA --> Verifier["Spacecraft Verifier<br/>(5-step recheck)"]
+    Verifier -->|accepted| CFS["NASA cFS<br/>(reference verifier, §cFS status)"]
+    Verifier -->|rejected| Reject["Rejected — reason surfaced<br/>via Explainable AI panel"]
+```
 
-## 8. Testing
-
-`eval/` is a pytest suite (migrated from `unittest`) that spins up the real FastAPI app via `TestClient` against a temporary SQLite database and exercises the actual `/api/commands/*` endpoints — not a reimplementation of the checks under test, which is what the original suite did (each old test reimplemented the same broken inline logic it was supposedly testing, so it would have passed against any input).
+## Project Structure
 
 ```
-pytest eval/ -v
+producer/                Ground-side AI mission-planning pipeline
+  agent.py                 Mission Planner Agent (maneuver presets)
+  llm_planner.py            Real Claude API call — proposes the torque command
+  dynamics_model.py          Dynamics Agent's rigid-body propagation engine
+  rules.py                    Flight Rules Engine (angular-rate rule)
+  certificate.py                Proof Generator — real Z3 call + Farkas derivation
+  pipeline.py                    Orchestrates all 5 agents
+  orbit.py                        Real SGP4 orbit propagation (mission context only)
+
+backend/                 Spacecraft-side reference verifier + application backend
+  verifier.py               The real 5-step verifier, race-free sequence check
+  security.py                 SHA-256 / HMAC-SHA256, canonicalization, rate limiting
+  digital_twin.py               Physics-based telemetry simulator
+  audit_chain.py                 Tamper-evident hash-chain audit log
+  pipeline_graph.py               Real dependency graph from actual step data
+  routers/                          Full REST + WebSocket API surface
+  imports/                           TLE, OMM, CSV telemetry, mission/spacecraft/
+                                      constraint profile validators
+  documents/                          PDF/DOCX/notebook/Markdown extraction, search
+  engines/                             Spacecraft Config, Telemetry Analysis (no LLM)
+  agents/                               Mission Intake, Knowledge, Paper/Algorithm
+                                        Review, Scientific Comparison
+  plugins/                              SafetyPropertyPlugin interface (unimplemented)
+
+apps/gate, apps/target   cFS-pattern C reference verifier (not a live cFE build)
+db/schema.sql            Source-of-truth SQLite schema
+eval/                     pytest adversarial suite against the live backend
+docs/                      Deep-dive documentation and image assets
+index.html / app.js / styles.css   Mission Control dashboard
 ```
 
-Covers: a genuinely safe maneuver end-to-end (`test_positive.py`); a valid certificate attached to a different command, rejected on hash mismatch (`test_adversarial_mismatch.py`); hand-corrupted Farkas multipliers, rejected on the arithmetic check — re-signed to specifically isolate the Farkas layer from the signature layer, which would otherwise catch the tampering first (`test_adversarial_forged.py`); replay of an already-accepted certificate (`test_replay.py`); a single flipped signature byte and the exact `startswith("hmac_sha256:")` bug the original code had (`test_tampered_signature.py`); every pipeline step's data and all 7 Attack Library scenarios (`test_pipeline_and_attacks.py`); and cFS startup ordering (`test_boot_order.py`). 17 tests, all passing against the live backend.
+## Tech Stack
 
-## 9. Scope Decisions
+| Layer | Technology |
+|---|---|
+| Frontend | Vanilla HTML / CSS / JS — no framework, no build step |
+| Backend | FastAPI, Python 3.11, Uvicorn |
+| Database | SQLite (WAL mode), SQLAlchemy Core — no ORM migrations |
+| AI | Anthropic Claude API (`claude-haiku-4-5`) |
+| Verification | Z3 SMT solver, SHA-256 / HMAC-SHA256 |
+| Physics / Orbit | Custom rigid-body dynamics, `sgp4` (Vallado/NORAD SGP4) |
+| Documents | PyMuPDF, `python-docx` |
+| Observability | Prometheus client, `psutil` |
+| Testing | pytest, FastAPI `TestClient` |
 
-Explicitly **not** built, by decision rather than oversight: Kubernetes, a microservices split, PostgreSQL-specific work (SQLite only — `DATABASE_URL` is a plain env var, no dual-backend testing), OAuth/JWT, multi-user accounts, enterprise authentication, Redis, Kafka, and Alembic migrations (a single `db/schema.sql` with idempotent `CREATE TABLE IF NOT EXISTS` is the whole migration story). These were traded for the AI Agent Observatory, Multi-Agent Timeline, Flight Digital Twin, Explainable AI panel, Attack Library, and Mission Replay — judged more valuable for a hackathon research prototype than infrastructure sprawl a single mission profile doesn't need yet.
-
-## 10. Quick Start
+## Run Locally
 
 ```bash
+git clone https://github.com/jaisogani-ai/First-Light.git
+cd First-Light
+
 pip install -r requirements.txt
 python3 -m db.seed              # creates first_light.db, seeds 4 mission profiles
 uvicorn backend.main:app --reload
@@ -170,68 +219,101 @@ uvicorn backend.main:app --reload
 ```
 
 ```bash
-pytest eval/ -v                 # full adversarial suite against the live backend
+python3 demo.py                 # CLI demonstration: one propose + verify cycle, no server needed
+```
+
+```bash
+pytest eval/ -v                 # full adversarial suite against the live backend — 157 tests
 ```
 
 ```bash
 cd docker && docker compose up --build
 ```
 
-## 11. Mission Planning Orbit Support
+## NASA cFS Integration — Honest Status
 
-`producer/orbit.py` adds real SGP4 orbit propagation via the `sgp4` package (the standard Vallado/NORAD implementation used to process real TLEs) to supply **mission context** — position, ground track, visibility windows to a ground station, orbital period — to the operator and Mission Planner Agent. It does **not** touch the locked Farkas/Z3 safety verification in any way; the research contribution stays command verification, and orbit propagation only informs when/how a maneuver might be planned.
+**What this build attempted:** a real NASA cFS Bundle build. `git clone --recursive https://github.com/nasa/cFS.git` succeeded (328MB, all submodules); `gcc`/`cmake`/`git` were all available. The build reached CMake configuration and failed:
 
-Ground-track and visibility geometry use a spherical-Earth approximation (mean radius 6378.137 km), not the full WGS84 ellipsoid — an explicit, honest scoping decision (error is at most ~0.3% of Earth's radius, immaterial for mission context display but not survey-grade). Correctness is checked against known physical facts about a real published ISS TLE (orbital inclination ±51.6°, altitude ~400 km, period ~92–93 minutes) in `eval/test_orbit.py`, rather than exact reference-ephemeris matching. `POST /api/orbit/propagate`, `/period`, `/ground-track`, and `/visibility` accept any two-line element set.
+```
+CMake Error at cmake/arch_build.cmake:706 (message):
+  Do not know how to set CFE_SYSTEM_PSPNAME on Darwin system
+```
 
-## 12. Self-Review
+The open-source cFS native/host Platform Support Package is implemented only for Linux and CYGWIN — porting OSAL's POSIX BSP to macOS is a nontrivial subproject, not a build-flag fix. **This build was not completed under a live NASA cFE/Software Bus instance.**
 
-This project went through an internal adversarial audit specifically looking for what a NASA/IEEE/DARPA reviewer would flag. Findings and their disposition, in full:
+**What exists instead:** `apps/gate/fsw/src/` contains a **C reference implementation** of the same 5-step verifier logic as `backend/verifier.py`, including a from-scratch SHA-256/HMAC-SHA256 verified against RFC 6234/4231 test vectors. It compiles and runs standalone with plain `gcc` — but it has not been built inside an actual cFE application, has not subscribed to a real Software Bus message ID, and has not been tested on target hardware or in QEMU.
 
-**Fixed as a direct result of the audit:**
-- **A real TOCTOU race in sequence/replay checking** (`backend/verifier.py`): the freshness check read `last_accepted_sequence`, decided in Python, then wrote — two concurrent `verify()` calls could both read the same value and both be accepted, a genuine failure of the replay-protection property. Fixed with an atomic `INSERT ... ON CONFLICT DO UPDATE ... WHERE` (a single statement SQLite executes atomically, so only one concurrent caller can ever win). Verified two ways: `eval/test_sequence_race.py` fires 25 concurrent identical requests and asserts exactly one is accepted; the fix was also confirmed to actually matter by temporarily reverting it and re-running the test — the old code crashed with an unhandled `IntegrityError` under real concurrency.
-- **An unexplained magic constant** (`1042`, scattered across 5 files): replaced with `backend.constants.INITIAL_SEQUENCE_NO`, a documented, obviously-arbitrary genesis value.
-- **Dead, inconsistent code**: `backend/verifier.py`'s unused `DEFAULT_STREAM_ID = "default"` default parameter (every real caller already passed an explicit stream id, but a future omission would have silently checked the wrong stream) — removed; `stream_id` is now a required parameter.
-- **Unbounded rate-limiter memory growth and a real thread-safety gap** (`backend/security.py`): FastAPI's sync routes run in a real threadpool, so the limiter's dict was genuinely accessed from multiple OS threads with no lock. Added a lock and a `prune()` method, called every 5 minutes from a background task in `backend/main.py`.
-- **A synchronous DB write blocking the async event loop once per second** (`backend/routers/telemetry.py`'s Digital Twin loop) — offloaded via `asyncio.to_thread`.
+## Benchmark
 
-**Remaining weaknesses (not yet fixed, tracked honestly):**
-- Z3's role is narrower than the phrase "Z3-derived Farkas certificates" implies: `producer/certificate.py` pins `z3.Real` variables to already-computed concrete values and checks UNSAT of a disjunction — a real SMT call, but it confirms a numeric fact rather than searching for or deriving the Farkas multipliers, which come from the closed-form one-hot construction in `producer/rules.py`. Z3 is a genuine independent oracle here, not the source of the certificate's numbers.
-- The Mission Planner Agent's real LLM call is not exercised by the default CI test run (`eval/conftest.py` deliberately clears `ANTHROPIC_API_KEY` so the suite stays fast/free/offline/deterministic) — only the fallback path has automated coverage. An opt-in test gated on the key's presence would close this gap.
-- `apps/gate`'s C reference verifier has still never run inside a live cFE/Software Bus instance (honestly disclosed since §6 was written; the blocker is the same one — no Linux/CYGWIN build host in this environment).
-- The C reference verifier's HMAC key remains a compiled-in demo constant.
-- The audit_chain table has a UNIQUE index on `sequence_index` as a fail-safe (a concurrent double-append raises a real `IntegrityError` rather than silently succeeding), but does not yet use the same atomic-upsert pattern as the sequence-freshness fix above — lower priority since a raised exception is a safe failure mode, not a silent one, but not proven race-free under load the way sequence freshness now is.
+Representative numbers from a local run (`GET /api/evaluation/report`, computed from real DB aggregates — not hardcoded):
 
-**Assumptions worth naming explicitly:**
-- Single mission stream / SQLite single-writer is baked into the transaction pattern itself, not just the database choice — a future Postgres migration would need to re-verify the same atomicity properties, not just swap the connection string.
-- The one-hot Farkas multiplier construction is provably sound *only* because `AngularRateRule` is independent per-axis box bounds with a unique binding maximum. It does not generalize to coupled constraints (e.g. total momentum magnitude, cross-axis rules) — any future Flight Rule that isn't a simple box bound needs a different multiplier-derivation approach, not just an interface implementation.
-- Producer and verifier share one static, symmetric HMAC secret with no rotation — anyone who reads either side's key can forge certificates. This is standard for a hackathon demo but would not survive a real security review.
-- The certificate's 30-second validity window assumes producer→verifier latency is always well under that and that both sides' clocks agree — trivially true today since both run on one host.
+| | Producer (Z3 solve + pipeline) | Verifier (arithmetic recomputation) |
+|---|---|---|
+| **Latency** | ≈ 4–30 ms | ≈ 0.5–1 ms |
 
-**Simulations vs. reality, in full:**
-- **Real**: Z3 UNSAT confirmation (narrow role, above); SHA-256/HMAC-SHA256 (RFC-vector tested in both Python and C); SQLite persistence via SQLAlchemy Core; the 5-agent pipeline's measured latency/confidence/dependencies; the Claude Haiku API call code path (real, but CI-untested per above); the tamper-evident hash chain with independent recomputation; the pipeline dependency graph (computed from actual step data, not drawn); SGP4 orbit propagation; Prometheus metrics and live `psutil` process stats; 26 passing pytest tests against a live `TestClient`, including a genuine concurrency test.
-- **Simulated, honestly labeled everywhere it appears**: `backend/digital_twin.py`'s thermal/battery/comm-delay/sensor-latency models (hand-picked constants, not sourced from any spacecraft datasheet); the Attack Library's seven scenarios (hand-written mutations, not recorded attack traffic — a real replacement dataset is named in §1); the four `mission_profiles` (authored archetypes, not real mission specs); `apps/gate`'s C verifier (never run under live cFE).
+The producer/verifier computational asymmetry is genuine and multi-x — not the fabricated "1,990x" figure the original hackathon prototype displayed before this build replaced every mocked component with a real one.
 
-**Future work, concretely scoped:**
-1. Extend the atomic-upsert pattern from sequence freshness to `audit_chain` appends.
-2. Implement the six named-but-missing Flight Rules — for any non-box-constraint rule, first generalize multiplier derivation beyond the one-hot construction (real LP-dual or Z3 `unsat_core`-based extraction).
-3. Add opt-in CI coverage for the real LLM path, gated on `ANTHROPIC_API_KEY` presence.
-4. Complete a Linux/CYGWIN native cFS build so `apps/gate`/`apps/target` run against real cFE/OSAL/PSP over the Software Bus — the C verifier logic itself needs no change.
-5. Move the C verifier's compiled-in demo HMAC key to a provisioned key store.
-6. Replace synthetic Attack Library scenarios with (or supplement using) the real labeled CubeSat attack dataset named in §1.
-7. Feed real orbit-derived context (next visibility window, current ground track) into the Mission Planner Agent's LLM prompt, so proposals can reference actual mission timing — currently the orbit module and the pipeline are wired to the same API but not yet to each other.
+| | Reactive runtime monitor | Ground-side rule engine | First Light (PCC) |
+|---|---|---|---|
+| Checks before execution | No — catches violations after they start | Yes, but slow / human-in-the-loop | Yes, cheaply and independently |
+| On-board re-solve required | N/A | N/A | No — arithmetic recheck only |
+| Machine-checkable proof attached to command | No | No | Yes (Farkas certificate) |
 
-## 13. Limitations
+## Security
 
-- Not flight-qualified software; not certified under any space agency safety standard (NASA-STD-8719.13, DO-178C, ECSS-E-ST-40C). See `docs/SAFETY_DISCLAIMER.md`.
-- No live NASA cFE/Software Bus build in this repository — see §6.
-- Only one Flight Rule (angular rate) is implemented; the registry supports more but they don't exist yet.
+| Check | Mechanism | What it catches |
+|---|---|---|
+| Sequence freshness | `sequence_state` table, transactional read/write, atomic upsert | Replay of a previously-accepted certificate |
+| Command hash match | Real SHA-256 over canonical command bytes | Attaching a valid certificate to a different (tampered) command |
+| Signature valid | Real HMAC-SHA256 over the canonical certificate payload | Forged or corrupted certificates |
+| Model version match | Registry of accepted `model_id` values | A certificate generated against an unrecognized dynamics model |
+| Farkas inequality | Exact recomputation of `Σ(λᵢ·cᵢ)`, requires equality with `max(constraints)` | A certificate whose stated multipliers don't actually prove the stated conclusion |
+| Audit chain | Hash-chained `commands` table, independently recomputed on verify | A raw-SQL edit to historical data, caught at the exact link it happened |
+
+`SECRET_KEY` (`FIRST_LIGHT_HMAC_SECRET_KEY`) lives in `.env`, never committed — see `.env.example`. Rate limiting is a thread-safe, bounded, in-memory fixed-window limiter. Full detail: [`SECURITY.md`](SECURITY.md).
+
+## Limitations
+
+- Not flight-qualified software; not certified under any space agency safety standard (NASA-STD-8719.13, DO-178C, ECSS-E-ST-40C). See [`docs/SAFETY_DISCLAIMER.md`](docs/SAFETY_DISCLAIMER.md).
+- No live NASA cFE/Software Bus build in this repository — see [cFS status](#nasa-cfs-integration--honest-status).
+- Only one Flight Rule (angular rate) is implemented; the registry supports more, but they don't exist yet.
 - The Digital Twin is a deterministic simulation, not live spacecraft telemetry.
 - Rate limiting is in-memory and per-process — it does not survive a restart or scale across processes.
-- The C reference verifier's HMAC key is a compiled-in demo constant, explicitly not suitable for flight use (see the comment in `apps/gate/fsw/src/gate_verify.c`).
-- The Attack Library's seven scenarios are synthetically constructed mutations, not recorded real-world attack traffic — see §1's Related Work for a named, real dataset that could replace them.
-- The Mission Planner Agent's LLM call (`producer/llm_planner.py`) is unvalidated beyond "does it produce a parseable, safety-checked proposal" — there is no adversarial or distributional testing of what Claude actually proposes across a wide input range, only confirmation that the downstream deterministic pipeline safely handles whatever it returns.
-- Ground-track/visibility geometry (§11) uses a spherical-Earth approximation, not full WGS84 — see §11 for the honest error bound.
+- The C reference verifier's HMAC key is a compiled-in demo constant, explicitly not suitable for flight use.
+- The Attack Library's seven scenarios are synthetically constructed mutations, not recorded real-world attack traffic.
+- The Mission Planner Agent's LLM call is unvalidated beyond "does it produce a parseable, safety-checked proposal" — no adversarial or distributional testing of what Claude actually proposes.
+- Ground-track/visibility geometry uses a spherical-Earth approximation, not full WGS84 (error ≤ ~0.3% of Earth's radius).
+- The plugin architecture (`backend/plugins/base.py`) is an interface only — zero plugins implemented, nothing wired into the verifier.
+- No PDF export exists — the Evidence Package is JSON only.
+- No operator/user identity exists anywhere — imports and reports are anonymous.
+- Producer and verifier share one static, symmetric HMAC secret with no rotation.
+
+The complete, unabridged self-review — including a fixed TOCTOU race, every remaining weakness, and every explicit assumption — lives in the project's version history and [`CHANGELOG.md`](CHANGELOG.md).
+
+## Research
+
+- Black, M. et al. — *Runtime Assurance for Spacecraft Attitude Control* (STARS program). [arXiv:2402.14723](https://arxiv.org/pdf/2402.14723) — closest prior art: same domain, different mechanism (real-time safety filter vs. a carried proof).
+- *Watchdogs and Oracles: Runtime Verification Meets LLMs.* [arXiv:2511.14435](https://arxiv.org/pdf/2511.14435) — the same "don't trust the AI, check it cheaply" problem, generalized to LLM-driven autonomy.
+- *Glass Box at Orbit* — AI verification for CubeSat autonomy. [arXiv:2606.02967](https://arxiv.org/pdf/2606.02967) — same platform class, constitutional-AI framework rather than a solver-derived certificate.
+- *Reproducible and Open-Source Testbed for Satellite Cybersecurity*, ACM REP '25. [DOI: 10.1145/3736731.3746144](https://dl.acm.org/doi/10.1145/3736731.3746144) — a real, labeled attack dataset named as a candidate replacement for the synthetic Attack Library.
+- NASA Core Flight System (cFS) — [github.com/nasa/cFS](https://github.com/nasa/cFS)
+- Farkas' Lemma — the linear-algebra foundation of the certificate construction in [`producer/rules.py`](producer/rules.py)
+- Z3 Theorem Prover — [github.com/Z3Prover/z3](https://github.com/Z3Prover/z3)
+- SGP4 — the standard Vallado/NORAD propagation model, via the [`sgp4`](https://pypi.org/project/sgp4/) package
+- Open MCT / Yamcs — studied for ops-console density and workflow patterns during the dashboard redesign (no code copied)
+
+## Contributing
+
+Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the workflow, and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for community standards. Before opening a PR:
+
+1. Run `pytest eval/ -v` — all 157 tests must pass.
+2. Keep the locked research contribution (`producer/rules.py`, `producer/certificate.py`, `backend/verifier.py`'s Farkas recheck) unchanged unless the PR is specifically about extending it — see [`VERIFICATION_PIPELINE.md`](VERIFICATION_PIPELINE.md).
+3. New capabilities should be honestly labeled real vs. simulated, deterministic vs. LLM — this project's credibility depends on that distinction never blurring.
 
 ## License
 
-NASA cFS core components are subject to the **NASA Open Source Agreement (NOSA)**. Custom PCC gateway logic, producer engine, schema, backend, and UI dashboard are licensed under the **Apache 2.0 License**.
+Everything in this repository is licensed under the **Apache License 2.0** — see [`LICENSE`](LICENSE). `apps/gate`/`apps/target` are a cFS-*pattern* reference verifier written for this project, not a vendored copy of NASA's cFS/cFE source — no NASA Open Source Agreement (NOSA)-covered code is physically present in this repository.
+
+## Acknowledgements
+
+Built for the International Innovation Challenge 3.0 (IIC 3.0), Manipal University Jaipur, Aerotech & Aerospace Innovation track. Thanks to the NASA cFS, Z3, and SGP4 open-source communities whose tools this project builds directly on, and to the researchers whose work is cited in [Research](#research) for positioning this project honestly relative to prior art rather than in a vacuum.

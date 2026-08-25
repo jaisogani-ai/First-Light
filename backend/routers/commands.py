@@ -8,13 +8,17 @@ from sqlalchemy import desc, select
 
 from backend.constants import INITIAL_SEQUENCE_NO
 from backend.db import engine
+from backend.logs import log_event
 from backend.models import commands, mission_profiles, pipeline_steps, sequence_state
 from backend.persistence import persist_command, persist_pipeline_steps, persist_verification
-from backend.schemas import ExplainData, ProposeRequest, TrustAssessment
+from backend.profile_lookup import load_profile
+from backend.schemas import ProposeRequest
 from backend.security import rate_limiter
+from backend.stream_id import mission_stream_id
 from backend.verifier import verify_command
 from backend.ws_manager import ws_manager
 from backend.routers.metrics import COMMANDS_REJECTED, COMMANDS_VERIFIED, PRODUCER_LATENCY, VERIFIER_LATENCY
+from db.seed import get_default_mission_id
 from producer.agent import MANEUVER_PRESETS
 from producer.pipeline import MissionPipeline
 
@@ -27,13 +31,6 @@ def _enforce_rate_limit(request: Request) -> None:
         raise HTTPException(429, "Rate limit exceeded")
 
 
-def _load_profile(conn, profile_key: str) -> dict:
-    row = conn.execute(select(mission_profiles).where(mission_profiles.c.profile_key == profile_key)).fetchone()
-    if not row:
-        raise HTTPException(404, f"Unknown mission profile '{profile_key}'")
-    return dict(row._mapping)
-
-
 def _next_sequence(conn, stream_id: str) -> int:
     row = conn.execute(select(sequence_state).where(sequence_state.c.stream_id == stream_id)).fetchone()
     return (row.last_accepted_sequence if row else INITIAL_SEQUENCE_NO) + 1
@@ -43,13 +40,15 @@ def _next_sequence(conn, stream_id: str) -> int:
 def propose(req: ProposeRequest, request: Request):
     _enforce_rate_limit(request)
     with engine.begin() as conn:
-        profile = _load_profile(conn, req.mission_profile_key)
+        profile = load_profile(conn, req.mission_profile_key)
+        mission_id = req.mission_id if req.mission_id is not None else get_default_mission_id(conn)
 
+    stream_id = mission_stream_id(mission_id)
     seq_holder = {"value": None}
 
     def allocate_sequence():
         with engine.begin() as conn:
-            seq_holder["value"] = _next_sequence(conn, req.mission_profile_key)
+            seq_holder["value"] = _next_sequence(conn, stream_id)
             return seq_holder["value"]
 
     pipeline = MissionPipeline(allocate_sequence)
@@ -69,7 +68,8 @@ def propose(req: ProposeRequest, request: Request):
     if not result["refused"]:
         with engine.begin() as conn:
             command_row_id = persist_command(
-                conn, cmd_id, profile["id"], result["proof"], actual_u_cmd, seq_holder["value"], producer_time_ms
+                conn, cmd_id, profile["id"], result["proof"], actual_u_cmd, seq_holder["value"], producer_time_ms,
+                mission_id=mission_id,
             )
             persist_pipeline_steps(conn, command_row_id, result["run_id"], result["steps"])
     else:
@@ -79,9 +79,18 @@ def propose(req: ProposeRequest, request: Request):
     ws_manager.broadcast_nowait({"type": "pipeline_run", "run_id": result["run_id"], "steps": result["steps"],
                                   "refused": result["refused"]})
 
+    if result["refused"]:
+        log_event("command.constraint_violated", mission_id=mission_id, command_id=cmd_id,
+                   maneuver_type=req.maneuver_type, refusal_reason=result["refusal_reason"])
+    else:
+        log_event("command.proposed", mission_id=mission_id, command_id=cmd_id,
+                   command_row_id=command_row_id, maneuver_type=req.maneuver_type,
+                   producer_time_ms=round(producer_time_ms, 4))
+
     return {
         "command_id": cmd_id,
         "command_row_id": command_row_id,
+        "mission_id": mission_id,
         "run_id": result["run_id"],
         "refused": result["refused"],
         "refusal_reason": result["refusal_reason"],
@@ -96,19 +105,26 @@ def propose(req: ProposeRequest, request: Request):
 def verify(body: dict, request: Request):
     """Verifies a proof payload against the actual command bytes it claims to cover.
 
-    Accepts {command_row_id, proof, submitted_command_id, submitted_u_cmd, mission_profile_key}
+    Accepts {command_row_id, proof, submitted_command_id, submitted_u_cmd, mission_id}
     so the Attack Library / adversarial tests can submit tampered payloads directly.
+    mission_id must match the mission the corresponding /propose call resolved to (explicit
+    or defaulted) — that's what determines which sequence_state stream this verification
+    checks monotonicity against. Omitted mission_id falls back to the same default mission
+    /propose falls back to, so legacy callers that never pass mission_id stay consistent.
     """
     _enforce_rate_limit(request)
     proof = body["proof"]
     submitted_command_id = body["submitted_command_id"]
     submitted_u_cmd = body["submitted_u_cmd"]
-    stream_id = body.get("mission_profile_key", "earth_observation")
     command_row_id = body.get("command_row_id")
 
     cmd_bytes = f"{submitted_command_id}:{submitted_u_cmd[0]}:{submitted_u_cmd[1]}:{submitted_u_cmd[2]}".encode("utf-8")
 
     with engine.begin() as conn:
+        mission_id = body.get("mission_id")
+        if mission_id is None:
+            mission_id = get_default_mission_id(conn)
+        stream_id = mission_stream_id(mission_id)
         result = verify_command(conn, proof, cmd_bytes, stream_id=stream_id)
         if command_row_id is not None:
             persist_verification(conn, command_row_id, result)
@@ -116,8 +132,12 @@ def verify(body: dict, request: Request):
     VERIFIER_LATENCY.observe(result.verifier_time_ms)
     if result.verdict == "VERIFIED":
         COMMANDS_VERIFIED.inc()
+        log_event("command.verified", mission_id=mission_id, command_id=submitted_command_id,
+                   verifier_time_ms=round(result.verifier_time_ms, 4))
     else:
         COMMANDS_REJECTED.labels(reason=result.explain.failing_step or "unknown").inc()
+        log_event("command.rejected", mission_id=mission_id, command_id=submitted_command_id,
+                   reject_reason=result.reject_reason)
 
     ws_manager.broadcast_nowait({"type": "verification", "command_id": submitted_command_id,
                                   "verdict": result.verdict, "trust": result.trust.model_dump()})
@@ -140,11 +160,4 @@ def feed(limit: int = 25):
             .join(mission_profiles, commands.c.mission_profile_id == mission_profiles.c.id)
             .order_by(desc(commands.c.id)).limit(limit)
         ).fetchall()
-    return [dict(r._mapping) for r in rows]
-
-
-@router.get("/export")
-def export():
-    with engine.connect() as conn:
-        rows = conn.execute(select(commands).order_by(desc(commands.c.id))).fetchall()
     return [dict(r._mapping) for r in rows]

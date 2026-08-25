@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from backend.audit_chain import verify_chain
 from backend.db import engine
+from backend.logs import log_event
 from backend.models import audit_chain, commands
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -25,4 +26,7 @@ def get_chain(limit: int = 100):
 @router.get("/verify")
 def verify():
     with engine.connect() as conn:
-        return verify_chain(conn)
+        result = verify_chain(conn)
+    if not result["valid"]:
+        log_event("audit.chain.broken", broken_at_index=result.get("broken_at_index"), reason=result.get("reason"))
+    return result

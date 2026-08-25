@@ -10,6 +10,7 @@ class ProposeRequest(BaseModel):
     mission_profile_key: str = "earth_observation"
     x0: list[float] | None = None
     u_cmd: list[float] | None = None
+    mission_id: int | None = None
 
 
 class TrustAssessment(BaseModel):
@@ -44,3 +45,31 @@ class VerifyResponse(BaseModel):
 class AttackRequest(BaseModel):
     attack_type: str
     mission_profile_key: str = "earth_observation"
+    mission_id: int | None = None
+
+
+class MissionCreateRequest(BaseModel):
+    mission_name: str
+    objective: str | None = None
+    mission_profile_key: str = "earth_observation"
+    tle_line1: str | None = None
+    tle_line2: str | None = None
+
+
+class MissionStatusUpdate(BaseModel):
+    status: str
+    active: bool | None = None
+
+
+class MissionResponse(BaseModel):
+    id: int
+    mission_name: str
+    objective: str | None
+    mission_profile_id: int
+    mission_profile_key: str
+    mission_profile_display_name: str
+    tle_line1: str | None
+    tle_line2: str | None
+    status: str
+    active: bool
+    created_at: str

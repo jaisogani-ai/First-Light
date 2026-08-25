@@ -30,7 +30,7 @@ TORQUE_SCHEMA = {
 def _get_client() -> Anthropic:
     global _client
     if _client is None:
-        _client = Anthropic()
+        _client = Anthropic(timeout=10.0)
     return _client
 
 

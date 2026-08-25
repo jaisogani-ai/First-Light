@@ -7,6 +7,14 @@ import tempfile
 _tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 os.environ["FIRST_LIGHT_DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
 os.environ["FIRST_LIGHT_HMAC_SECRET_KEY"] = "test_only_secret_key_do_not_use_in_prod"
+# Isolate uploaded Mission Files the same way as the DB — never write into the real
+# repo-local data/mission_documents/ directory from the test suite.
+os.environ["FIRST_LIGHT_MISSION_DOCUMENTS_DIR"] = tempfile.mkdtemp(prefix="first_light_docs_")
+# The full suite issues far more than 60 req/min from one shared session-scoped TestClient
+# (same "testclient" host on every request) — that's a test-harness artifact, not something
+# the production per-minute limit is meant to gate. Raise it here so eval/ tests real business
+# logic, not the rate limiter itself (which has no dedicated test — see README known limitations).
+os.environ["FIRST_LIGHT_RATE_LIMIT_PER_MINUTE"] = "100000"
 
 import pytest
 from fastapi.testclient import TestClient

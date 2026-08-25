@@ -12,3 +12,5 @@ httpx==0.28.1
 anthropic==0.116.0
 python-dotenv==1.2.2
 sgp4==2.27
+pymupdf==1.27.2
+python-docx==1.2.0
