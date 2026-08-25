@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/images/hero.png" alt="First Light — Mission Control" width="100%">
-</p>
-
 <h1 align="center">FIRST LIGHT</h1>
 <p align="center"><strong>Proof-Carrying Commands for AI-Generated Spacecraft Operations</strong></p>
 <p align="center">NASA cFS &nbsp;•&nbsp; Z3 &nbsp;•&nbsp; Farkas Certificates &nbsp;•&nbsp; Digital Twin &nbsp;•&nbsp; Mission AI</p>
@@ -34,22 +30,6 @@
 **Track:** Aerotech & Aerospace Innovation — International Innovation Challenge 3.0 (IIC 3.0), Manipal University Jaipur
 
 **Deep-dive references** (this README is the map; these are the territory): [`ARCHITECTURE.md`](ARCHITECTURE.md) (component map, DB schema, API flow) · [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) (design trade-offs) · [`VERIFICATION_PIPELINE.md`](VERIFICATION_PIPELINE.md) (the locked PCC research) · [`AGENTS.md`](AGENTS.md) (every agent, real vs. simulated) · [`MISSION_WORKFLOW.md`](MISSION_WORKFLOW.md) · [`SECURITY.md`](SECURITY.md) · [`ROADMAP.md`](ROADMAP.md) · [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
-
----
-
-## Project Preview
-
-| Mission Overview | Mission Planning |
-|:---:|:---:|
-| ![Mission Overview](docs/images/overview.png) | ![Mission Planning](docs/images/mission-planning.png) |
-| Live mission health, agent reasoning, command feed | Real Planner → Dynamics → Safety → Proof → Reviewer → Verifier pipeline |
-
-| Verification | Digital Twin |
-|:---:|:---:|
-| ![Verification](docs/images/verification.png) | ![Digital Twin](docs/images/digital-twin.png) |
-| Farkas certificate detail, hash-chain audit, attack library | Live attitude, power, thermal, and orbit propagation |
-
-> **Demo:** a recorded run belongs at [`docs/images/demo.gif`](docs/images/demo.gif) — the file currently at that path is a placeholder frame; replace it with a real screen capture of a propose → verify → reject cycle.
 
 ---
 
