@@ -23,6 +23,7 @@
   <a href="#system-architecture">Architecture</a> ·
   <a href="#ai-agents">Agents</a> ·
   <a href="#run-locally">Run locally</a> ·
+  <a href="#demo-flow-23-minutes">Demo flow</a> ·
   <a href="#nasa-cfs-integration--honest-status">cFS status</a> ·
   <a href="#limitations">Limitations</a>
 </p>
@@ -30,6 +31,13 @@
 ---
 
 **Track:** Aerotech & Aerospace Innovation — International Innovation Challenge 3.0 (IIC 3.0), Manipal University Jaipur
+
+### 60-Second Overview
+
+- **Problem:** an AI agent proposing spacecraft maneuvers can't be trusted blindly, but re-running a full safety solve on the flight computer is too expensive.
+- **Solution:** the AI proves safety on the ground (a real Z3 SMT solve → Farkas certificate); the spacecraft only re-checks the proof's own arithmetic — no second solve, sub-millisecond.
+- **Proof it's real:** 13 live agents, 157 passing tests, a working FastAPI backend, and 4 unedited screenshots below — captured from an actual unsafe maneuver getting refused by the live verifier, this session.
+- **Where the line is:** no live NASA cFE build (see [cFS status](#nasa-cfs-integration--honest-status)); one Flight Rule implemented so far; full list in [Limitations](#limitations).
 
 **Deep-dive references** (this README is the map; these are the territory): [`ARCHITECTURE.md`](ARCHITECTURE.md) (component map, DB schema, API flow) · [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) (design trade-offs) · [`VERIFICATION_PIPELINE.md`](VERIFICATION_PIPELINE.md) (the locked PCC research) · [`AGENTS.md`](AGENTS.md) (every agent, real vs. simulated) · [`MISSION_WORKFLOW.md`](MISSION_WORKFLOW.md) · [`SECURITY.md`](SECURITY.md) · [`ROADMAP.md`](ROADMAP.md) · [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
@@ -141,6 +149,12 @@ Full component map, DB schema, and every API route: [`ARCHITECTURE.md`](ARCHITEC
 
 ## AI Agents
 
+**13 real agents total, in two categories** — the Multi-Agent Pipeline screen's roster panel shows **5** because it displays only the locked, safety-critical Proof-Carrying Commands chain (Planner → Dynamics → Safety → Proof Generator → Reviewer); the other **8** are engineering agents that operate on mission *context* (documents, telemetry, spacecraft config) and never propose or influence a verified command. All 13 rows below are live, not a mix of built and planned.
+
+### Category 1 — Proof-Carrying Commands pipeline (locked, 5 agents)
+
+The only chain that can produce a verified command. Shown live on the Multi-Agent Pipeline screen's roster.
+
 | Agent | Purpose | Deterministic / LLM | Status |
 |---|---|---|---|
 | **Mission Planner** | Proposes the 3-axis torque command | Real Claude API call (`claude-haiku-4-5`), deterministic preset fallback | Live |
@@ -148,6 +162,13 @@ Full component map, DB schema, and every API route: [`ARCHITECTURE.md`](ARCHITEC
 | **Safety** | Evaluates the Flight Rules Engine (angular-rate bound) | Deterministic | Live |
 | **Proof Generator** | Derives the Farkas certificate; confirms UNSAT via real Z3 | Deterministic derivation + real Z3 SMT call | Live |
 | **Reviewer** | Independently recomputes `Σ(λᵢ·cᵢ)` before allowing a sign-off | Deterministic | Live |
+
+### Category 2 — Engineering agents (context only, 8 agents)
+
+Operate on mission documents, telemetry, and configuration. Cannot propose or influence a verified command.
+
+| Agent | Purpose | Deterministic / LLM | Status |
+|---|---|---|---|
 | **Mission Intake** | Detects duplicate/corrupt/unsupported uploads and missing mission fields | Deterministic, rule-based | Live |
 | **Mission Knowledge** | Grounded Q&A over uploaded Mission Files, refuses when no evidence exists | Real Claude call, evidence-gated | Live |
 | **Paper Review** | Structured review of an uploaded research paper | Real Claude call, forced JSON schema | Live |
@@ -245,6 +266,19 @@ pytest eval/ -v                 # full adversarial suite against the live backen
 ```bash
 cd docker && docker compose up --build
 ```
+
+## Demo Flow (2–3 Minutes)
+
+A concrete sequence to see the real safety mechanism work, start to finish:
+
+1. **Mission Overview** — open a mission, note the live telemetry (velocity, altitude, bus power) and the 5-agent command graph.
+2. **Mission Planning** — click **Propose Safe RCS Maneuver**, then **Evaluate Z3 Proof & Verify Certificate**. Watch the real Farkas certificate JSON populate — this is a genuine Z3 solve, not a template.
+3. **Multi-Agent Pipeline** — see the same run's 5 agents (Planner → Dynamics → Safety → Proof Generator → Reviewer), each with real latency, confidence, and raw I/O.
+4. **Verification** — the certificate gets independently re-checked by the deterministic verifier. Try dragging the torque sliders on Mission Planning to a larger value and re-evaluate — watch a real rejection appear here, with the exact constraint that was violated.
+5. **Digital Twin** — the same rejection shown as a live Farkas infeasibility plot against the angular-rate bound.
+6. **Verification → Attack Library** — click **Run Attack** on any of the 7 scenarios to watch the live verifier catch a tampered or replayed certificate in real time.
+
+Every step above hits a real endpoint — nothing on this path is scripted or pre-recorded.
 
 ## NASA cFS Integration — Honest Status
 

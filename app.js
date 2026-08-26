@@ -391,8 +391,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const latVal = document.querySelectorAll('.agent-io-col .stat-cell strong')[0];
         const confVal = document.querySelectorAll('.agent-io-col .stat-cell strong')[1];
         const agentTitle = document.querySelector('.agent-reasoning-col .panel-header h3');
+        const statusBadge = document.getElementById('agent-status-badge');
 
         if (agentTitle) agentTitle.innerHTML = `<span class="material-symbols-outlined">psychology</span> ${step.agent_name}`;
+        if (statusBadge) {
+            const isDone = step.status === 'COMPLETED' || step.status === 'OK';
+            const isBad = step.status === 'REFUSED' || step.status === 'REJECTED';
+            statusBadge.textContent = step.status || 'UNKNOWN';
+            statusBadge.className = 'badge ' + (isBad ? 'badge-danger' : isDone ? 'badge-success' : 'badge-warning');
+        }
         if (reasoningP) reasoningP.textContent = step.reasoning_summary || 'No reasoning summary available.';
         if (latVal) latVal.textContent = `${(step.latency_ms || 0).toFixed(2)} ms`;
         if (confVal) confVal.textContent = `${((step.confidence || 0.99) * 100).toFixed(1)} %`;
@@ -425,40 +432,35 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPipelineSteps = steps || [];
         const el = document.getElementById('agent-observatory');
 
-        // Update Overview graph & reasoning if steps exist
-        if (steps && steps.length) {
-            const totalLat = steps.reduce((sum, s) => sum + (s.latency_ms || 0), 0);
-            const avgConf = steps.reduce((sum, s) => sum + (s.confidence || 0), 0) / (steps.length || 1);
+        // Real agent count in this pipeline run — never a hardcoded placeholder
+        const badge = document.getElementById('roster-active-badge');
+        if (badge) badge.textContent = steps && steps.length ? `${steps.length} AGENTS` : '0 AGENTS';
 
-            const latEl = document.querySelector('.pipeline-stats-header .chip-val');
-            const confEl = document.querySelectorAll('.pipeline-stats-header .chip-val')[1];
-            if (latEl) latEl.textContent = `${totalLat.toFixed(0)}ms`;
-            if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
+        // Active Propagation Nodes on Pipeline screen — always reflects real step data
+        const nodeFlow = document.querySelector('.pipeline-nodes-flow');
+        if (nodeFlow) {
+            const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer', 'cFS Ref', 'Verifier', 'Accepted'];
+            nodeFlow.innerHTML = nodeNames.map((name, idx) => {
+                const step = steps && steps[idx];
+                const isDone = !!step && (step.status === 'COMPLETED' || step.status === 'OK');
+                const isWarn = !!step && (step.status === 'REFUSED' || step.status === 'REJECTED');
+                const circleClass = isWarn ? 'active warning' : isDone ? 'complete' : '';
+                const icon = isDone ? 'check_circle' : isWarn ? 'warning' : 'circle';
+                const lineClass = isDone ? 'active' : '';
+                return `
+                    <div class="pipeline-node">
+                        <div class="node-circle ${circleClass}"><span class="material-symbols-outlined">${icon}</span></div>
+                        <span class="node-label ${isWarn ? 'amber font-semibold' : ''}">${name}</span>
+                    </div>
+                    ${idx < nodeNames.length - 1 ? `<div class="node-line ${lineClass}"></div>` : ''}
+                `;
+            }).join('');
+        }
 
-            // Update Active Propagation Nodes on Pipeline screen
-            const nodeFlow = document.querySelector('.pipeline-nodes-flow');
-            if (nodeFlow) {
-                const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer', 'cFS Ref', 'Verifier', 'Accepted'];
-                nodeFlow.innerHTML = nodeNames.map((name, idx) => {
-                    const step = steps[idx];
-                    const isDone = step ? (step.status === 'COMPLETED' || step.status === 'OK') : idx <= 4;
-                    const isWarn = step && (step.status === 'REFUSED' || step.status === 'REJECTED');
-                    const circleClass = isWarn ? 'active warning' : isDone ? 'complete' : '';
-                    const icon = isDone ? 'check_circle' : isWarn ? 'warning' : 'circle';
-                    const lineClass = isDone ? 'active' : '';
-                    return `
-                        <div class="pipeline-node">
-                            <div class="node-circle ${circleClass}"><span class="material-symbols-outlined">${icon}</span></div>
-                            <span class="node-label ${isWarn ? 'amber font-semibold' : ''}">${name}</span>
-                        </div>
-                        ${idx < nodeNames.length - 1 ? `<div class="node-line ${lineClass}"></div>` : ''}
-                    `;
-                }).join('');
-            }
-
-            // Update Roster List
-            const rosterCol = document.querySelector('.roster-list');
-            if (rosterCol) {
+        // Roster List — real steps, or an honest empty state (never fake preset agents)
+        const rosterCol = document.querySelector('.roster-list');
+        if (rosterCol) {
+            if (steps && steps.length) {
                 rosterCol.innerHTML = steps.map((s, idx) => `
                     <button class="roster-item ${idx === selectedAgentIndex ? 'active amber' : ''}" data-agent-idx="${idx}">
                         <div class="roster-item-top">
@@ -477,7 +479,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         renderAgentObservatory(currentPipelineSteps, sourceLabel);
                     });
                 });
+            } else {
+                rosterCol.innerHTML = '<p class="card-desc">No pipeline run yet for this mission — propose a maneuver on Mission Planning.</p>';
             }
+        }
+
+        if (steps && steps.length) {
+            const totalLat = steps.reduce((sum, s) => sum + (s.latency_ms || 0), 0);
+            const avgConf = steps.reduce((sum, s) => sum + (s.confidence || 0), 0) / (steps.length || 1);
+
+            const latEl = document.querySelector('.pipeline-stats-header .chip-val');
+            const confEl = document.querySelectorAll('.pipeline-stats-header .chip-val')[1];
+            if (latEl) latEl.textContent = `${totalLat.toFixed(0)}ms`;
+            if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
 
             renderPipelineDeepDive(steps[selectedAgentIndex] || steps[0]);
         }
@@ -485,6 +499,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!steps || !steps.length) {
             if (el) el.innerHTML = emptyState('Awaiting pipeline activity',
                 'No pipeline run exists yet for this mission. Propose a maneuver on Mission Planning to see the real Planner → Dynamics → Safety → Proof Generator → Reviewer chain execute here.');
+            const agentTitle = document.querySelector('.agent-reasoning-col .panel-header h3');
+            const reasoningP = document.querySelector('.agent-reasoning-col .reasoning-p');
+            const treeBox = document.querySelector('.agent-reasoning-col .tree-box');
+            if (agentTitle) agentTitle.innerHTML = '<span class="material-symbols-outlined">psychology</span> No agent selected';
+            if (reasoningP) reasoningP.textContent = 'Propose a maneuver on Mission Planning to see a real agent\'s reasoning here.';
+            if (treeBox) treeBox.innerHTML = '';
+            const statusBadge = document.getElementById('agent-status-badge');
+            if (statusBadge) { statusBadge.textContent = 'IDLE'; statusBadge.className = 'badge badge-info'; }
+            document.querySelectorAll('.agent-io-col .json-code').forEach(elm => { elm.textContent = 'No pipeline run yet.'; });
+            document.querySelectorAll('.agent-io-col .stat-cell strong').forEach(elm => { elm.textContent = '—'; });
             return;
         }
         if (el) {
