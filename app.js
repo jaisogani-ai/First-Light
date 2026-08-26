@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Active Propagation Nodes on Pipeline screen — always reflects real step data
         const nodeFlow = document.querySelector('.pipeline-nodes-flow');
         if (nodeFlow) {
-            const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer', 'cFS Ref', 'Verifier', 'Accepted'];
+            const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer'];
             nodeFlow.innerHTML = nodeNames.map((name, idx) => {
                 const step = steps && steps[idx];
                 const isDone = !!step && (step.status === 'COMPLETED' || step.status === 'OK');
