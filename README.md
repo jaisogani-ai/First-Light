@@ -76,15 +76,15 @@ The verifier's design goal — cheap, independent, on-board re-checking of an AI
 
 | Mission Overview | Multi-Agent Pipeline |
 |:---:|:---:|
-| ![Mission Overview — live telemetry, agent reasoning, and command feed](docs/images/dashboard-overview.png) | ![Multi-Agent Pipeline Observatory — live execution trace of all 5 producer agents](docs/images/agent-pipeline.png) |
-| Live mission health, agent reasoning, and command feed — the operator's first screen | The real 5-agent Planner → Dynamics → Safety → Proof → Reviewer chain, with per-agent latency, confidence, and raw JSON I/O |
+| ![Mission Overview](docs/images/mission-overview-v2.png) | ![Multi-Agent Pipeline — 5 real agents](docs/images/multi-agent-pipeline-v2.png) |
+| Live telemetry, agent reasoning, and command feed. | The real 5-agent chain — Planner → Dynamics → Safety → Proof → Reviewer — with live latency, confidence, and JSON I/O. |
 
 | Verification | Digital Twin |
 |:---:|:---:|
-| ![Verification screen — a live Farkas certificate refused by the deterministic verifier](docs/images/verification.png) | ![Digital Twin — live attitude, Farkas infeasibility plot, and a rejected maneuver](docs/images/digital-twin.png) |
-| A real maneuver refused by the verifier, with the exact constraint it violated and the full certificate payload | The Farkas infeasibility barrier plot and rigid-body attitude state for the same rejected maneuver |
+| ![Verification — a maneuver refused by the live verifier](docs/images/verification-panel-v2.png) | ![Digital Twin — the same rejection as a live Farkas plot](docs/images/digital-twin-v2.png) |
+| A real maneuver refused, with the exact constraint it violated. | The Farkas infeasibility plot for that same rejected maneuver. |
 
-Every screenshot above is a live capture of the running application — none are mockups. The verification and digital-twin screens were captured immediately after this session ran an unsafe maneuver through the real Planner → Dynamics → Safety → Proof Generator → Reviewer → Verifier pipeline and watched it get refused.
+Live captures of the running app — no mockups. The roster panel on Multi-Agent Pipeline shows **5 agents** because that screen is only the locked, safety-critical chain; see [AI Agents](#ai-agents) for the other 8.
 
 ## Key Features
 
