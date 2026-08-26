@@ -25,7 +25,8 @@
   <a href="#run-locally">Run locally</a> ·
   <a href="#demo-flow-23-minutes">Demo flow</a> ·
   <a href="#nasa-cfs-integration--honest-status">cFS status</a> ·
-  <a href="#limitations">Limitations</a>
+  <a href="#limitations">Limitations</a> ·
+  <a href="#roadmap">Roadmap</a>
 </p>
 
 ---
@@ -339,6 +340,18 @@ The producer/verifier computational asymmetry is genuine and multi-x — not the
 - Producer and verifier share one static, symmetric HMAC secret with no rotation.
 
 The complete, unabridged self-review — including a fixed TOCTOU race, every remaining weakness, and every explicit assumption — lives in the project's version history and [`CHANGELOG.md`](CHANGELOG.md).
+
+## Roadmap
+
+Real, scoped future work — none of it built yet, none of it claimed as built anywhere above. No timeline is committed.
+
+- A real Linux/CYGWIN native cFS build, so `apps/gate`/`apps/target` run against real cFE/OSAL/PSP over the Software Bus — see [cFS status](#nasa-cfs-integration--honest-status) for why this hasn't happened yet.
+- Additional Flight Rules beyond the one implemented (angular rate) — the registry supports more, but each needs its own Farkas multiplier derivation.
+- Replacing the Attack Library's 7 synthetic scenarios with real recorded attack traffic (a candidate dataset is named in [Research](#research)).
+- A first real `SafetyPropertyPlugin` implementation — the interface exists; zero plugins are wired in.
+- PDF export for the Evidence Package (JSON only today) and multi-user identity (no operator/user concept exists anywhere yet).
+
+Explicitly *not* planned: Kubernetes, a microservices split, PostgreSQL migration, cloud deployment — traded for research-facing depth instead. Full detail: [`ROADMAP.md`](ROADMAP.md).
 
 ## Research
 
