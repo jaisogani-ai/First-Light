@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update Active Propagation Nodes on Pipeline screen
             const nodeFlow = document.querySelector('.pipeline-nodes-flow');
             if (nodeFlow) {
-                const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer', 'NASA cFS', 'Verifier', 'Accepted'];
+                const nodeNames = ['Planner', 'Dynamics', 'Safety', 'Proof', 'Reviewer', 'cFS Ref', 'Verifier', 'Accepted'];
                 nodeFlow.innerHTML = nodeNames.map((name, idx) => {
                     const step = steps[idx];
                     const isDone = step ? (step.status === 'COMPLETED' || step.status === 'OK') : idx <= 4;
@@ -546,6 +546,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const ovPass = document.getElementById('ov-pass-count'), ovDrop = document.getElementById('ov-drop-count');
         if (ovPass) ovPass.textContent = verified;
         if (ovDrop) ovDrop.textContent = rejected;
+
+        const cpuVal = document.getElementById('sys-cpu-value'), cpuBar = document.getElementById('sys-cpu-bar');
+        if (cpuVal) { cpuVal.textContent = `${report.process_cpu_percent.toFixed(1)}%`; cpuBar.style.width = `${Math.min(report.process_cpu_percent, 100)}%`; }
+        const memVal = document.getElementById('sys-mem-value'), memBar = document.getElementById('sys-mem-bar');
+        if (memVal) { memVal.textContent = `${report.process_memory_mb.toFixed(0)} MB`; memBar.style.width = `${Math.min(report.process_memory_mb / 512 * 100, 100)}%`; }
+        const attacksVal = document.getElementById('sys-attacks-value'), attacksBar = document.getElementById('sys-attacks-bar');
+        if (attacksVal) { attacksVal.textContent = report.attacks_simulated; attacksBar.style.width = `${Math.min(report.attacks_simulated * 10, 100)}%`; }
+
         return report;
     }
 

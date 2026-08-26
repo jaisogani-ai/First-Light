@@ -383,7 +383,7 @@
                         <input type="range" id="slider-uy" min="-0.05" max="0.05" step="0.001" value="-0.002">
                     </div>
                     <button class="btn btn-primary full-width" id="btn-calc-proof">
-                        Evaluate Z3 Proof &amp; Test NASA cFS Verifier
+                        Evaluate Z3 Proof &amp; Verify Certificate
                     </button>
                 </div>
 
@@ -912,7 +912,7 @@
                     <div class="node-line"></div>
                     <div class="pipeline-node">
                         <div class="node-circle"><span class="material-symbols-outlined">satellite_alt</span></div>
-                        <span class="node-label">NASA cFS</span>
+                        <span class="node-label">cFS Ref</span>
                     </div>
                     <div class="node-line"></div>
                     <div class="pipeline-node">
@@ -978,7 +978,7 @@
 
                         <button class="roster-item disabled">
                             <div class="roster-item-top">
-                                <span>NASA cFS Interface</span>
+                                <span>cFS Reference (C)</span>
                                 <span class="status-dot gray"></span>
                             </div>
                             <div class="roster-item-meta font-mono">
@@ -1111,7 +1111,7 @@
                 <div class="panel ver-col-left">
                     <div class="panel-header">
                         <h3 class="flex-icon text-purple"><span class="material-symbols-outlined">shield_lock</span> Proof Verification</h3>
-                        <span class="badge badge-purple">Zk-SNARK</span>
+                        <span class="badge badge-purple">Farkas Certificate</span>
                     </div>
 
                     <div class="cert-graphic-box">
@@ -1120,7 +1120,7 @@
                             <div class="orbit-ring-anim"></div>
                         </div>
                         <div class="cert-hash-details">
-                            <div class="font-mono font-bold text-primary">Zk-SNARK Validated</div>
+                            <div class="font-mono font-bold text-primary">Certificate Verified</div>
                             <div class="cert-hash-badge font-mono">0x7F8B...9A2C</div>
                         </div>
                         <div class="cert-stats-row font-mono">
@@ -1226,18 +1226,18 @@
 
                     <div class="health-gauges">
                         <div class="gauge-card">
-                            <div class="flex-between font-mono"><span class="sub-label">CPU LOAD</span><strong>42%</strong></div>
-                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill cyan" style="width:42%"></div></div>
+                            <div class="flex-between font-mono"><span class="sub-label">BACKEND CPU</span><strong id="sys-cpu-value">—</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill cyan" id="sys-cpu-bar" style="width:0%"></div></div>
                         </div>
 
                         <div class="gauge-card">
-                            <div class="flex-between font-mono"><span class="sub-label">MEM USAGE</span><strong>8.4 / 16 GB</strong></div>
-                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill blue" style="width:52%"></div></div>
+                            <div class="flex-between font-mono"><span class="sub-label">BACKEND MEM</span><strong id="sys-mem-value">—</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill blue" id="sys-mem-bar" style="width:0%"></div></div>
                         </div>
 
                         <div class="gauge-card">
-                            <div class="flex-between font-mono"><span class="sub-label">QUEUE DEPTH</span><strong class="text-amber">14 msgs</strong></div>
-                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill amber" style="width:28%"></div></div>
+                            <div class="flex-between font-mono"><span class="sub-label">ATTACKS SIMULATED</span><strong class="text-amber" id="sys-attacks-value">—</strong></div>
+                            <div class="bar-track" style="height:4px;margin-top:0.35rem"><div class="bar-fill amber" id="sys-attacks-bar" style="width:0%"></div></div>
                         </div>
 
                         <div class="flex-between border-t border-b" style="padding:0.5rem 0;margin-top:0.5rem">
@@ -1254,7 +1254,7 @@
                                 <span class="status-dot green"></span>
                             </div>
                             <div class="uplink-item">
-                                <span class="flex-icon font-mono text-sm"><span class="material-symbols-outlined">memory</span> NASA cFS Core</span>
+                                <span class="flex-icon font-mono text-sm"><span class="material-symbols-outlined">memory</span> PCC Verifier (local)</span>
                                 <span class="status-dot green"></span>
                             </div>
                             <div class="uplink-item">

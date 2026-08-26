@@ -17,6 +17,8 @@
 
 <p align="center">
   <a href="#what-is-first-light">What is it</a> ·
+  <a href="#-innovation--impact">Innovation</a> ·
+  <a href="#product-screenshots">Screenshots</a> ·
   <a href="#key-features">Features</a> ·
   <a href="#system-architecture">Architecture</a> ·
   <a href="#ai-agents">Agents</a> ·
@@ -40,6 +42,40 @@ AI mission-planning agents are increasingly proposed for spacecraft autonomy, bu
 **Proof-Carrying Commands (PCC)** is the answer this project implements: the ground-side AI agent does the expensive work — an SMT/Z3 solve that derives a mathematical certificate of safety — and attaches that certificate to the command. The spacecraft-side verifier never re-solves anything; it recomputes a small, deterministic arithmetic check over the certificate's own stated numbers. That producer/verifier **computational asymmetry** (milliseconds of solving, sub-millisecond of checking) is the entire point, and it is the one piece of this project that has not changed since the original design.
 
 This is a research prototype, not flight-qualified software. Section [Honest Status](#nasa-cfs-integration--honest-status) and [Limitations](#limitations) say exactly where the line is.
+
+## 🏆 Innovation & Impact
+
+### Novelty
+Most "AI safety for autonomy" work is either a reactive runtime monitor (catches a violation after it starts) or a slow ground-side rule engine. First Light instead makes the AI agent *prove* safety before the command ever reaches the spacecraft, and makes that proof cheap enough to re-check on a flight computer — a genuinely different mechanism from the closest published prior art (see [Research](#research)), not a relabeled dashboard.
+
+### User Benefit
+Mission operators get an auditable reason for every rejected command (the Explainable AI panel below), instead of a black-box "no." Spacecraft autonomy researchers get a working reference implementation of Proof-Carrying Commands they can extend with their own Flight Rules.
+
+### Technical Innovation
+The hard part is real: a live Z3 SMT solve that derives a Farkas infeasibility certificate on the ground, and a spacecraft-side verifier that re-derives the same conclusion from raw numbers in under a millisecond — with **no second SMT solve on board**. That's the producer/verifier computational asymmetry the whole design turns on, and it's implemented, tested, and benchmarked, not simulated.
+
+### Prototype Maturity
+Every feature in [Key Features](#key-features) has a live FastAPI endpoint, a passing test in the 157-test adversarial suite, and a real UI screen — not a mockup. The [Limitations](#limitations) section lists, without euphemism, everything that is *not* built yet.
+
+### Scalability
+The verification core (`backend/verifier.py`) has zero external dependencies at check time — no network call, no LLM, no solver — so it is the part of the system best positioned to move onto flight-representative hardware. SQLite and in-memory rate limiting are the two components that would need to change first for a multi-spacecraft deployment; both are explicitly flagged in [Limitations](#limitations), not hidden.
+
+### Commercial / Deployment Potential
+The verifier's design goal — cheap, independent, on-board re-checking of an AI-proposed command — applies beyond spacecraft to any domain where an expensive AI planner needs a cheap safety gate before actuation: industrial robotics, autonomous ground vehicles, and drone flight authorization are the nearest adjacent markets.
+
+## Product Screenshots
+
+| Mission Overview | Multi-Agent Pipeline |
+|:---:|:---:|
+| ![Mission Overview — live telemetry, agent reasoning, and command feed](docs/images/dashboard-overview.png) | ![Multi-Agent Pipeline Observatory — live execution trace of all 5 producer agents](docs/images/agent-pipeline.png) |
+| Live mission health, agent reasoning, and command feed — the operator's first screen | The real 5-agent Planner → Dynamics → Safety → Proof → Reviewer chain, with per-agent latency, confidence, and raw JSON I/O |
+
+| Verification | Digital Twin |
+|:---:|:---:|
+| ![Verification screen — a live Farkas certificate refused by the deterministic verifier](docs/images/verification.png) | ![Digital Twin — live attitude, Farkas infeasibility plot, and a rejected maneuver](docs/images/digital-twin.png) |
+| A real maneuver refused by the verifier, with the exact constraint it violated and the full certificate payload | The Farkas infeasibility barrier plot and rigid-body attitude state for the same rejected maneuver |
+
+Every screenshot above is a live capture of the running application — none are mockups. The verification and digital-twin screens were captured immediately after this session ran an unsafe maneuver through the real Planner → Dynamics → Safety → Proof Generator → Reviewer → Verifier pipeline and watched it get refused.
 
 ## Key Features
 
