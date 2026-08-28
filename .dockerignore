@@ -1,0 +1,8 @@
+.env
+.pcc_secret_key
+*.db-shm
+*.db-wal
+__pycache__
+.pytest_cache
+*.pyc
+.git
